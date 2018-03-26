@@ -40,29 +40,29 @@ rearrange (x :| y) = case x of
 rearrange (Many x) = Many (rearrange x)
 rearrange x        = x
 
-simplifyMany :: Reg c -> Reg c
-simplifyMany (Many x) = simplifyMany (simplify x)
-simplifyMany Empty    = Eps
-simplifyMany Eps      = Eps
-simplifyMany x        = Many x
+sMany :: Reg c -> Reg c
+sMany (Many x) = sMany (simplify x)
+sMany Empty    = Eps
+sMany Eps      = Eps
+sMany x        = Many x
 
-simplifyConcat :: Reg c -> Reg c -> Reg c
-simplifyConcat x Empty = Empty
-simplifyConcat Empty y = Empty
-simplifyConcat x Eps   = x
-simplifyConcat Eps y   = y
-simplifyConcat x y     = x :> y
+sConcat :: Reg c -> Reg c -> Reg c
+sConcat x Empty = Empty
+sConcat Empty y = Empty
+sConcat x Eps   = x
+sConcat Eps y   = y
+sConcat x y     = x :> y
 
-simplifyAlter :: Reg c -> Reg c -> Reg c
-simplifyAlter Empty Empty = Empty
-simplifyAlter Eps Eps     = Eps
-simplifyAlter x y         = x :| y
+sAlter :: Reg c -> Reg c -> Reg c
+sAlter x Empty = x
+sAlter Empty y = y
+sAlter Eps Eps = Eps
+sAlter x y  = x :| y
 
 simplify :: Reg c -> Reg c
-simplify (Lit c)  = Lit c
-simplify (Many x) = simplifyMany (simplify x)
-simplify (x :> y) = simplifyConcat (simplify x) (simplify y)
-simplify (x :| y) = simplifyAlter (simplify x) (simplify y)
+simplify (Many x) = sMany (simplify x)
+simplify (x :> y) = sConcat (simplify x) (simplify y)
+simplify (x :| y) = sAlter (simplify x) (simplify y)
 simplify x        = x
 
 simpl :: Reg c -> Reg c
@@ -77,10 +77,10 @@ der c Eps      = Empty
 der c Empty    = Empty
 der c (Many x) = (der c x) :> (Many x)
 der c (x :> y)
-  | nullable x = der_x :| simpl (der c y)
+  | nullable x = der_x :| der c y
   | otherwise  = der_x
   where
-    der_x = simpl ((der c x) :> y)
+    der_x = (der c x) :> y
 der c (x :| y) = (der c x) :| (der c y)
 
 ders :: Eq c => [c] -> Reg c -> Reg c
@@ -89,11 +89,10 @@ ders (x:xs) r = ders xs (simpl (der x r))
 
 
 accepts :: Eq c => Reg c -> [c] -> Bool
-accepts r w = ders_w /= Empty && nullable ders_w
-  where ders_w = ders w r
+accepts r w = nullable (ders w r)
 
 mayStart :: Eq c => c -> Reg c -> Bool
-mayStart c r = der c r /= Empty
+mayStart c r = simpl (der c r) /= Empty
 
 match :: Eq c => Reg c -> [c] -> Maybe [c]
 match r w = Nothing
