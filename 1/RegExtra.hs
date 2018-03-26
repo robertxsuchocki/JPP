@@ -30,15 +30,19 @@ empty Empty = True
 empty _     = False
 
 
-rearrange :: Reg c -> Reg c
-rearrange (x :> y) = case x of
-  (x1 :> x2) -> (rearrange (x1 :> (rearrange (x2 :> y))))
-  _          -> (rearrange x) :> (rearrange y)
-rearrange (x :| y) = case x of
-  (x1 :| x2) -> (rearrange (x1 :| (rearrange (x2 :| y))))
-  _          -> (rearrange x) :| (rearrange y)
-rearrange (Many x) = Many (rearrange x)
-rearrange x        = x
+findAllConcats :: Reg c -> [Reg c]
+findAllConcats (x :> y) = findAllConcats x ++ findAllConcats y
+findAllConcats x        = [x]
+
+findAllAlters :: Reg c -> [Reg c]
+findAllAlters (x :| y) = findAllAlters x ++ findAllAlters y
+findAllAlters x        = [x]
+
+rearrange :: Eq c => Reg c -> Reg c
+rearrange r@(x :> y) = foldr1 (:>) (findAllConcats r)
+rearrange r@(x :| y) = foldr1 (:|) (nub (findAllAlters r))
+rearrange (Many x)   = Many (rearrange x)
+rearrange x          = x
 
 sMany :: Reg c -> Reg c
 sMany (Many x) = sMany (simplify x)
@@ -54,10 +58,9 @@ sConcat Eps y   = y
 sConcat x y     = x :> y
 
 sAlter :: Reg c -> Reg c -> Reg c
-sAlter x Empty = x
-sAlter Empty y = y
-sAlter Eps Eps = Eps
-sAlter x y  = x :| y
+sAlter Empty Empty = Empty
+sAlter Eps Eps     = Eps
+sAlter x y         = x :| y
 
 simplify :: Reg c -> Reg c
 simplify (Many x) = sMany (simplify x)
@@ -65,7 +68,7 @@ simplify (x :> y) = sConcat (simplify x) (simplify y)
 simplify (x :| y) = sAlter (simplify x) (simplify y)
 simplify x        = x
 
-simpl :: Reg c -> Reg c
+simpl :: Eq c => Reg c -> Reg c
 simpl = rearrange . simplify
 
 
@@ -77,10 +80,11 @@ der c Eps      = Empty
 der c Empty    = Empty
 der c (Many x) = (der c x) :> (Many x)
 der c (x :> y)
-  | nullable x = der_x :| der c y
-  | otherwise  = der_x
+  | nullable x = (der_x :> y) :| der_y
+  | otherwise  = der_x :> y
   where
-    der_x = (der c x) :> y
+    der_x = der c x
+    der_y = der c y
 der c (x :| y) = (der c x) :| (der c y)
 
 ders :: Eq c => [c] -> Reg c -> Reg c

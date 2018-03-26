@@ -2,18 +2,18 @@ subStr :: Eq c => ([c], Reg c) -> ([c], Reg c)
 subStr ([], x)    = ([], x)
 subStr (l, Empty) = (l, Empty)
 subStr (l, Eps)   = (l, Eps)
-subStr (S (x:xs) (Lit c))
+subStr ((x:xs), (Lit c))
   | c == x    = (xs, Eps)
-  | otherwise = (S (x:xs) Empty)
-subStr (l (Many, a))
+  | otherwise = ((x:xs), Empty)
+subStr (l, (Many) a)
   | l_a == l   = (l_a, Eps)
-  | otherwise  = subStr (l_a (Many, a))
+  | otherwise  = subStr (l_a, (Many) a)
   where
     (l_a, r_a) = subStr (l, simpl a)
-subStr (l (a :>, b)) = (l_b, r_b) where
+subStr (l, a :> b) = (l_b, r_b) where
   (l_a, r_a) = subStr (l, simpl a)
   (l_b, r_b) = subStr (l_a, simpl (r_a :> b))
-subStr (l (a :|, b)) = res_min where
+subStr (a :| b, l) = res_min where
   (l_a, r_a) = subStr (l, simpl a)
   (l_b, r_b) = subStr (l, simpl b)
   res_min = if (length l_a) < (length l_b) then (l_a, r_a) else (l_b, r_b)
@@ -42,3 +42,13 @@ der c (Many x) = (Many x)
 ders :: Eq c => [c] -> Reg c -> Reg c
 ders []     r = r
 ders (x:xs) r = ders xs (simpl (der x r))
+
+rearrange :: Reg c -> Reg c
+rearrange (x :> y) = case x of
+  (x1 :> x2) -> (rearrange (x1 :> (x2 :> y)))
+  _          -> (rearrange x) :> (rearrange y)
+rearrange (x :| y) = case x of
+  (x1 :| x2) -> (rearrange (x1 :| (x2 :| y)))
+  _          -> (rearrange x) :| (rearrange y)
+rearrange (Many x) = Many (rearrange x)
+rearrange x        = x
