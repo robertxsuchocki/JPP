@@ -38,14 +38,8 @@ findAllAlters :: Reg c -> [Reg c]
 findAllAlters (x :| y) = findAllAlters x ++ findAllAlters y
 findAllAlters x        = [x]
 
-rearrange :: Eq c => Reg c -> Reg c
-rearrange r@(x :> y) = foldr1 (:>) (findAllConcats r)
-rearrange r@(x :| y) = foldr1 (:|) (nub (findAllAlters r))
-rearrange (Many x)   = Many (rearrange x)
-rearrange x          = x
-
-sMany :: Reg c -> Reg c
-sMany (Many x) = sMany (simplify x)
+sMany :: Eq c => Reg c -> Reg c
+sMany (Many x) = sMany (simpl x)
 sMany Empty    = Eps
 sMany Eps      = Eps
 sMany x        = Many x
@@ -55,23 +49,21 @@ sConcat x Empty = Empty
 sConcat Empty y = Empty
 sConcat x Eps   = x
 sConcat Eps y   = y
-sConcat x y     = x :> y
+sConcat x y     = foldr1 (:>) (findAllConcats (x :> y))
 
-sAlter :: Reg c -> Reg c -> Reg c
+sAlter :: Eq c => Reg c -> Reg c -> Reg c
 sAlter Empty Empty = Empty
 sAlter Eps Eps     = Eps
-sAlter x y         = x :| y
-
-simplify :: Reg c -> Reg c
-simplify (Many x) = sMany (simplify x)
-simplify (x :> y) = sConcat (simplify x) (simplify y)
-simplify (x :| y) = sAlter (simplify x) (simplify y)
-simplify x        = x
+sAlter x y         = foldr1 (:|) (nub (findAllAlters (x :| y)))
 
 simpl :: Eq c => Reg c -> Reg c
-simpl = rearrange . simplify
+simpl (Many x) = sMany (simpl x)
+simpl (x :> y) = sConcat (simpl x) (simpl y)
+simpl (x :| y) = sAlter (simpl x) (simpl y)
+simpl x        = x
 
 
+-- https://en.wikipedia.org/wiki/Brzozowski_derivative
 der :: Eq c => c -> Reg c -> Reg c
 der c (Lit x)
   | x == c     = Eps
@@ -98,11 +90,32 @@ accepts r w = nullable (ders w r)
 mayStart :: Eq c => c -> Reg c -> Bool
 mayStart c r = simpl (der c r) /= Empty
 
+matchList :: Eq c => Reg c -> [c] -> [[c]]
+matchList r [] = []
+matchList r l@(x:xs)
+  | acceptsX  = [x] : extMatches
+  | mayStartX = extMatches
+  | otherwise = []
+  where
+    der_x = simpl (der x r)
+    acceptsX = nullable der_x
+    mayStartX = der_x /= Empty
+    extMatches = map (x:) (matchList der_x xs)
+
 match :: Eq c => Reg c -> [c] -> Maybe [c]
-match r w = Nothing
+match r w
+  | null matches = Nothing
+  | otherwise    = Just (last matches)
+  where
+    matches = matchList r w
 
 search :: Eq c => Reg c -> [c] -> Maybe [c]
-search r w = Nothing
+search r [] = Nothing
+search r l@(x:xs) = case (longest) of
+  Nothing -> search r xs
+  Just x  -> Just x
+  where
+    longest = match r l
 
 findall :: Eq c => Reg c -> [c] -> [[c]]
 findall r w = []
