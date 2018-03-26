@@ -24,12 +24,12 @@ main = do
 
        writeln "=== reflexive"
        quickCheck equivRefl
-       -- writeln "=== symmetric"
-       -- writeln "Expect `Gave up' message"
-       -- quickCheck equivSym
-       -- writeln "=== transitive"
-       -- writeln "Expect `Gave up' message"
-       -- quickCheck equivTrans
+       writeln "=== symmetric"
+       writeln "Expect `Gave up' message"
+       quickCheck equivSym
+       writeln "=== transitive"
+       writeln "Expect `Gave up' message"
+       quickCheck equivTrans
        writeln "=== compatible"
        quickCheck equivCompatible
 

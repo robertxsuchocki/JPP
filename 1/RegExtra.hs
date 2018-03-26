@@ -5,8 +5,6 @@ import Data.List
 
 data AB = A | B deriving (Eq,Ord,Show)
 
-data SimulState c = S [c] (Reg c)
-
 infix 4 ===
 class Equiv a where
   (===) :: a -> a -> Bool
@@ -44,7 +42,7 @@ rearrange x        = x
 
 simplifyMany :: Reg c -> Reg c
 simplifyMany (Many x) = simplifyMany (simplify x)
-simplifyMany Empty    = Eps :| Empty
+simplifyMany Empty    = Eps
 simplifyMany Eps      = Eps
 simplifyMany x        = Many x
 
@@ -71,36 +69,23 @@ simpl :: Reg c -> Reg c
 simpl = rearrange . simplify
 
 
-subStr :: Eq c => SimulState c -> SimulState c
-subStr (S [] x)    = (S [] x)
-subStr (S l Empty) = (S l Empty)
-subStr (S l Eps)   = (S l Eps)
-subStr (S (x:xs) (Lit c))
-  | c == x    = (S xs Eps)
-  | otherwise = (S (x:xs) Empty)
-subStr (S l (Many a))
-  | l_a == l   = (S l_a Eps)
-  | otherwise  = subStr (S l_a (Many a))
-  where
-    (S l_a r_a) = subStr (S l (simpl a))
-subStr (S l (a :> b)) = (S l_b r_b) where
-  (S l_a r_a) = subStr (S l (simpl a))
-  (S l_b r_b) = subStr (S l_a (simpl (r_a :> b)))
-subStr (S l (a :| b)) = res_min where
-  (S l_a r_a) = subStr (S l (simpl a))
-  (S l_b r_b) = subStr (S l (simpl b))
-  res_min = if (length l_a) < (length l_b) then (S l_a r_a) else (S l_b r_b)
-
 der :: Eq c => c -> Reg c -> Reg c
-der c = ders [c]
+der c (Lit x)
+  | x == c     = Eps
+  | otherwise  = Empty
+der c Eps      = Empty
+der c Empty    = Empty
+der c (Many x) = (der c x) :> (Many x)
+der c (x :> y)
+  | nullable x = der_x :| simpl (der c y)
+  | otherwise  = der_x
+  where
+    der_x = simpl ((der c x) :> y)
+der c (x :| y) = (der c x) :| (der c y)
 
 ders :: Eq c => [c] -> Reg c -> Reg c
-ders c r
-  | not_empty = Empty
-  | otherwise = new_r
-  where
-    (S new_l new_r) = subStr (S c (simpl r))
-    not_empty = new_l /= []
+ders []     r = r
+ders (x:xs) r = ders xs (simpl (der x r))
 
 
 accepts :: Eq c => Reg c -> [c] -> Bool
