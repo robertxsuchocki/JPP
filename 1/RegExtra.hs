@@ -3,7 +3,7 @@ import Mon
 import Reg
 import Data.List
 
-data AB = A | B deriving (Eq,Ord,Show)
+data AB = A | B deriving (Eq, Ord, Show)
 
 infix 4 ===
 class Equiv a where
@@ -13,7 +13,7 @@ instance (Eq c) => Equiv (Reg c) where
    r1 === r2 = simpl r1 == simpl r2
 
 instance Mon (Reg c) where
-  m1 = Eps
+  m1   = Eps
   (<>) = (:>)
 
 
@@ -28,6 +28,7 @@ empty :: Reg c -> Bool
 empty Empty = True
 empty _     = False
 
+nonempty :: Reg c -> Bool
 nonempty = not . empty
 
 gatherConcats :: Reg c -> [Reg c]
@@ -44,13 +45,13 @@ sConcat x y
   | onlyEps   = Eps
   | otherwise = foldr1 (:>) withoutEps
   where
-    concats    = map (simpl) $ gatherConcats $ x :> y
+    concats    = map simpl $ gatherConcats $ x :> y
     hasEmpty   = any (== Empty) concats
     withoutEps = filter (/= Eps) concats
     onlyEps    = null withoutEps
 
 sAlter :: Eq c => Reg c -> Reg c -> Reg c
-sAlter x y = foldr1 (:|) $ map (simpl) $ nub $ gatherAlters $ x :| y
+sAlter x y = foldr1 (:|) $ map simpl $ nub $ gatherAlters $ x :| y
 
 sMany :: Eq c => Reg c -> Reg c
 sMany (Many x) = sMany x
@@ -70,8 +71,8 @@ der :: Eq c => c -> Reg c -> Reg c
 der c (Lit x)
   | x == c     = Eps
   | otherwise  = Empty
-der c Eps      = Empty
-der c Empty    = Empty
+der _ Eps      = Empty
+der _ Empty    = Empty
 der c (Many x) = (der c x) :> (Many x)
 der c (x :> y)
   | nullable x = (der_x :> y) :| der_y
@@ -87,28 +88,31 @@ ders (x:xs) r = ders xs $ simpl $ der x r
 
 
 accepts :: Eq c => Reg c -> [c] -> Bool
-accepts r w = nullable (ders w r)
+accepts r w = nullable $ ders w r
 
 mayStart :: Eq c => c -> Reg c -> Bool
 mayStart c r = nonempty $ simpl $ der c r
 
-match :: Eq c => Reg c -> [c] -> Maybe [c]
-match r []
-  | nullable r = Just []
-  | otherwise = Nothing
-match r (x:xs)
-  | valid     = Just (x : matched)
-  | otherwise = Nothing
+match' :: Eq c => Reg c -> [c] -> Maybe [c]
+match' _ [] = Nothing
+match' r (x:xs)
+  | valid      = Just (x : matched)
+  | otherwise  = Nothing
   where
-    der_x   = simpl (der x r)
-    match_x = match der_x xs
+    der_x   = simpl $ der x r
+    match_x = match' der_x xs
     valid   = nullable der_x || nonempty der_x && match_x /= Nothing
     matched = case match_x of
       Nothing -> []
       Just a  -> a
 
+match :: Eq c => Reg c -> [c] -> Maybe [c]
+match r l = case match' r l of
+  Nothing -> if nullable r then Just [] else Nothing
+  x       -> x
+
 search :: Eq c => Reg c -> [c] -> Maybe [c]
-search r [] = Nothing
+search _ [] = Nothing
 search r l@(_:xs) = case match r l of
   Nothing -> search r xs
   Just a  -> Just a
@@ -116,7 +120,7 @@ search r l@(_:xs) = case match r l of
 cutCovered :: Int -> [[c]] -> [[c]]
 cutCovered _ []     = []
 cutCovered n (l:ls)
-  | len_l < n = cutCovered (n-1) ls
+  | len_l < n = cutCovered (n - 1) ls
   | otherwise = l : cutCovered len_l ls
   where
     len_l = length l

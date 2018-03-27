@@ -99,3 +99,19 @@ match r w
   where
     hasMatches = not (null matches)
     matches = matchList r w
+
+match :: Eq c => Reg c -> [c] -> Maybe [c]
+match r []
+  | nullable r = Just []
+  | otherwise = Nothing
+match r (x:xs)
+  | valid      = Just (x : matched)
+  | nullable r = Just []
+  | otherwise  = Nothing
+  where
+    der_x   = simpl (der x r)
+    match_x = match der_x xs
+    valid   = nullable der_x || nonempty der_x && match_x /= Nothing
+    matched = case match_x of
+      Nothing -> []
+      Just a  -> a
