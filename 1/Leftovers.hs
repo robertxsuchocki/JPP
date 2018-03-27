@@ -64,3 +64,38 @@ sAlter :: Eq c => Reg c -> Reg c -> Reg c
 sAlter Empty Empty = Empty
 sAlter Eps Eps     = Eps
 sAlter x y         = foldr1 (:|) (nub (findAllAlters (x :| y)))
+
+
+match :: Eq c => Reg c -> [c] -> Maybe [c]
+match r l
+  | currValid  = Just (head l : matched)
+  | nullable r = Just []
+  | otherwise  = Nothing
+  where
+    der_x = simpl (der (head l) r)
+    currValid = not ((null l) || (empty der_x) || (nullable der_x))
+    matched = case match der_x (tail l) of
+      Nothing -> []
+      Just a  -> a
+
+
+matchList :: Eq c => Reg c -> [c] -> [[c]]
+matchList r [] = []
+matchList r l@(x:xs)
+  | acceptsX  = [x] : extMatches
+  | mayStartX = extMatches
+  | otherwise = []
+  where
+    der_x      = simpl (der x r)
+    acceptsX   = nullable der_x
+    mayStartX  = not $ empty $ der_x
+    extMatches = map (x:) $ matchList der_x xs
+
+match :: Eq c => Reg c -> [c] -> Maybe [c]
+match r w
+  | hasMatches = Just (last matches)
+  | nullable r = Just []
+  | otherwise  = Nothing
+  where
+    hasMatches = not (null matches)
+    matches = matchList r w

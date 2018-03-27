@@ -28,14 +28,15 @@ empty :: Reg c -> Bool
 empty Empty = True
 empty _     = False
 
+nonempty = not . empty
 
-findAllConcats :: Reg c -> [Reg c]
-findAllConcats (x :> y) = findAllConcats x ++ findAllConcats y
-findAllConcats x        = [x]
+gatherConcats :: Reg c -> [Reg c]
+gatherConcats (x :> y) = gatherConcats x ++ gatherConcats y
+gatherConcats x        = [x]
 
-findAllAlters :: Reg c -> [Reg c]
-findAllAlters (x :| y) = findAllAlters x ++ findAllAlters y
-findAllAlters x        = [x]
+gatherAlters :: Reg c -> [Reg c]
+gatherAlters (x :| y) = gatherAlters x ++ gatherAlters y
+gatherAlters x        = [x]
 
 sConcat :: Eq c => Reg c -> Reg c -> Reg c
 sConcat x y
@@ -43,13 +44,13 @@ sConcat x y
   | onlyEps   = Eps
   | otherwise = foldr1 (:>) withoutEps
   where
-    concats    = map (simpl) (findAllConcats (x :> y))
+    concats    = map (simpl) $ gatherConcats $ x :> y
     hasEmpty   = any (== Empty) concats
     withoutEps = filter (/= Eps) concats
     onlyEps    = null withoutEps
 
 sAlter :: Eq c => Reg c -> Reg c -> Reg c
-sAlter x y = foldr1 (:|) (map (simpl) (nub (findAllAlters (x :| y))))
+sAlter x y = foldr1 (:|) $ map (simpl) $ nub $ gatherAlters $ x :| y
 
 sMany :: Eq c => Reg c -> Reg c
 sMany (Many x) = sMany x
@@ -82,44 +83,52 @@ der c (x :| y) = (der c x) :| (der c y)
 
 ders :: Eq c => [c] -> Reg c -> Reg c
 ders []     r = r
-ders (x:xs) r = ders xs (simpl (der x r))
+ders (x:xs) r = ders xs $ simpl $ der x r
 
 
 accepts :: Eq c => Reg c -> [c] -> Bool
 accepts r w = nullable (ders w r)
 
 mayStart :: Eq c => c -> Reg c -> Bool
-mayStart c r = simpl (der c r) /= Empty
-
-matchList :: Eq c => Reg c -> [c] -> [[c]]
-matchList r [] = []
-matchList r l@(x:xs)
-  | acceptsX  = [x] : extMatches
-  | mayStartX = extMatches
-  | otherwise = []
-  where
-    der_x      = simpl (der x r)
-    acceptsX   = nullable der_x
-    mayStartX  = der_x /= Empty
-    extMatches = map (x:) (matchList der_x xs)
+mayStart c r = nonempty $ simpl $ der c r
 
 match :: Eq c => Reg c -> [c] -> Maybe [c]
-match r w
-  | null matches = Nothing
-  | otherwise    = Just (last matches)
+match r []
+  | nullable r = Just []
+  | otherwise = Nothing
+match r (x:xs)
+  | valid     = Just (x : matched)
+  | otherwise = Nothing
   where
-    matches = matchList r w
+    der_x   = simpl (der x r)
+    match_x = match der_x xs
+    valid   = nullable der_x || nonempty der_x && match_x /= Nothing
+    matched = case match_x of
+      Nothing -> []
+      Just a  -> a
 
 search :: Eq c => Reg c -> [c] -> Maybe [c]
 search r [] = Nothing
-search r l@(x:xs) = case (longest) of
+search r l@(_:xs) = case match r l of
   Nothing -> search r xs
-  Just x  -> Just x
+  Just a  -> Just a
+
+cutCovered :: Int -> [[c]] -> [[c]]
+cutCovered _ []     = []
+cutCovered n (l:ls)
+  | len_l < n = cutCovered (n-1) ls
+  | otherwise = l : cutCovered len_l ls
   where
-    longest = match r l
+    len_l = length l
+
+unpackMaybes :: [Maybe a] -> [a]
+unpackMaybes [] = []
+unpackMaybes (x:xs) = case x of
+  Nothing -> unpackMaybes xs
+  Just a  -> a : unpackMaybes xs
 
 findall :: Eq c => Reg c -> [c] -> [[c]]
-findall r w = []
+findall r w = cutCovered 0 $ unpackMaybes $ map (match r) $ init $ tails w
 
 
 char :: Char -> Reg Char
