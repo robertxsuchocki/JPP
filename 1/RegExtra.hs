@@ -12,7 +12,6 @@ class Equiv a where
 instance (Eq c) => Equiv (Reg c) where
    r1 === r2 = simpl r1 == simpl r2
 
-
 instance Mon (Reg c) where
   m1 = Eps
   (<>) = (:>)
@@ -38,12 +37,6 @@ findAllAlters :: Reg c -> [Reg c]
 findAllAlters (x :| y) = findAllAlters x ++ findAllAlters y
 findAllAlters x        = [x]
 
-sMany :: Eq c => Reg c -> Reg c
-sMany (Many x) = sMany x
-sMany Empty    = Eps
-sMany Eps      = Eps
-sMany x        = Many (simpl x)
-
 sConcat :: Eq c => Reg c -> Reg c -> Reg c
 sConcat x y
   | hasEmpty  = Empty
@@ -58,10 +51,16 @@ sConcat x y
 sAlter :: Eq c => Reg c -> Reg c -> Reg c
 sAlter x y = foldr1 (:|) (map (simpl) (nub (findAllAlters (x :| y))))
 
+sMany :: Eq c => Reg c -> Reg c
+sMany (Many x) = sMany x
+sMany Empty    = Eps
+sMany Eps      = Eps
+sMany x        = Many (simpl x)
+
 simpl :: Eq c => Reg c -> Reg c
-simpl (Many x) = sMany x
 simpl (x :> y) = sConcat x y
 simpl (x :| y) = sAlter x y
+simpl (Many x) = sMany x
 simpl x        = x
 
 

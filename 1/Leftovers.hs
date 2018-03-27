@@ -52,3 +52,15 @@ rearrange (x :| y) = case x of
   _          -> (rearrange x) :| (rearrange y)
 rearrange (Many x) = Many (rearrange x)
 rearrange x        = x
+
+sConcat :: Reg c -> Reg c -> Reg c
+sConcat x Empty = Empty
+sConcat Empty y = Empty
+sConcat x Eps   = x
+sConcat Eps y   = y
+sConcat x y     = foldr1 (:>) (findAllConcats (x :> y))
+
+sAlter :: Eq c => Reg c -> Reg c -> Reg c
+sAlter Empty Empty = Empty
+sAlter Eps Eps     = Eps
+sAlter x y         = foldr1 (:|) (nub (findAllAlters (x :| y)))
