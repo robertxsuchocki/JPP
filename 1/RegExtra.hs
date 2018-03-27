@@ -39,27 +39,29 @@ findAllAlters (x :| y) = findAllAlters x ++ findAllAlters y
 findAllAlters x        = [x]
 
 sMany :: Eq c => Reg c -> Reg c
-sMany (Many x) = sMany (simpl x)
+sMany (Many x) = sMany x
 sMany Empty    = Eps
 sMany Eps      = Eps
-sMany x        = Many x
+sMany x        = Many (simpl x)
 
-sConcat :: Reg c -> Reg c -> Reg c
-sConcat x Empty = Empty
-sConcat Empty y = Empty
-sConcat x Eps   = x
-sConcat Eps y   = y
-sConcat x y     = foldr1 (:>) (findAllConcats (x :> y))
+sConcat :: Eq c => Reg c -> Reg c -> Reg c
+sConcat x y
+  | hasEmpty  = Empty
+  | onlyEps   = Eps
+  | otherwise = foldr1 (:>) withoutEps
+  where
+    concats    = map (simpl) (findAllConcats (x :> y))
+    hasEmpty   = any (== Empty) concats
+    withoutEps = filter (/= Eps) concats
+    onlyEps    = null withoutEps
 
 sAlter :: Eq c => Reg c -> Reg c -> Reg c
-sAlter Empty Empty = Empty
-sAlter Eps Eps     = Eps
-sAlter x y         = foldr1 (:|) (nub (findAllAlters (x :| y)))
+sAlter x y = foldr1 (:|) (map (simpl) (nub (findAllAlters (x :| y))))
 
 simpl :: Eq c => Reg c -> Reg c
-simpl (Many x) = sMany (simpl x)
-simpl (x :> y) = sConcat (simpl x) (simpl y)
-simpl (x :| y) = sAlter (simpl x) (simpl y)
+simpl (Many x) = sMany x
+simpl (x :> y) = sConcat x y
+simpl (x :| y) = sAlter x y
 simpl x        = x
 
 
@@ -97,9 +99,9 @@ matchList r l@(x:xs)
   | mayStartX = extMatches
   | otherwise = []
   where
-    der_x = simpl (der x r)
-    acceptsX = nullable der_x
-    mayStartX = der_x /= Empty
+    der_x      = simpl (der x r)
+    acceptsX   = nullable der_x
+    mayStartX  = der_x /= Empty
     extMatches = map (x:) (matchList der_x xs)
 
 match :: Eq c => Reg c -> [c] -> Maybe [c]
