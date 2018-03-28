@@ -31,6 +31,7 @@ empty _     = False
 nonempty :: Reg c -> Bool
 nonempty = not . empty
 
+
 gatherConcats :: Reg c -> [Reg c]
 gatherConcats (x :> y) = gatherConcats x ++ gatherConcats y
 gatherConcats x        = [x]
@@ -39,8 +40,8 @@ gatherAlters :: Reg c -> [Reg c]
 gatherAlters (x :| y) = gatherAlters x ++ gatherAlters y
 gatherAlters x        = [x]
 
-sConcat :: Eq c => Reg c -> Reg c -> Reg c
-sConcat x y
+simplConcat :: Eq c => Reg c -> Reg c -> Reg c
+simplConcat x y
   | hasEmpty  = Empty
   | onlyEps   = Eps
   | otherwise = foldr1 (:>) withoutEps
@@ -50,19 +51,19 @@ sConcat x y
     withoutEps = filter (/= Eps) concats
     onlyEps    = null withoutEps
 
-sAlter :: Eq c => Reg c -> Reg c -> Reg c
-sAlter x y = foldr1 (:|) $ map simpl $ nub $ gatherAlters $ x :| y
+simplAlter :: Eq c => Reg c -> Reg c -> Reg c
+simplAlter x y = foldr1 (:|) $ map simpl $ nub $ gatherAlters $ x :| y
 
-sMany :: Eq c => Reg c -> Reg c
-sMany (Many x) = sMany x
-sMany Empty    = Eps
-sMany Eps      = Eps
-sMany x        = Many (simpl x)
+simplMany :: Eq c => Reg c -> Reg c
+simplMany (Many x) = simplMany x
+simplMany Empty    = Eps
+simplMany Eps      = Eps
+simplMany x        = Many (simpl x)
 
 simpl :: Eq c => Reg c -> Reg c
-simpl (x :> y) = sConcat x y
-simpl (x :| y) = sAlter x y
-simpl (Many x) = sMany x
+simpl (x :> y) = simplConcat x y
+simpl (x :| y) = simplAlter x y
+simpl (Many x) = simplMany x
 simpl x        = x
 
 
