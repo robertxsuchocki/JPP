@@ -13,8 +13,8 @@ instance (Eq c) => Equiv (Reg c) where
    r1 === r2 = simpl r1 == simpl r2
 
 instance Mon (Reg c) where
-  m1   = Eps
-  (<>) = (:>)
+  m1     = Eps
+  x <> y = x :> y
 
 
 nullable :: Reg c -> Bool
@@ -97,29 +97,30 @@ mayStart c r = nonempty $ simpl $ der c r
 match' :: Eq c => Reg c -> [c] -> Maybe [c]
 match' _ [] = Nothing
 match' r (x:xs)
-  | valid      = Just (x : matched)
-  | otherwise  = Nothing
+  | valid     = Just (x : matched)
+  | otherwise = Nothing
   where
     der_x   = simpl $ der x r
     match_x = match' der_x xs
     valid   = nullable der_x || nonempty der_x && match_x /= Nothing
-    matched = case match_x of
-      Nothing -> []
-      Just a  -> a
+    matched = case match_x of Nothing -> []
+                              Just a  -> a
 
 match :: Eq c => Reg c -> [c] -> Maybe [c]
-match r l = case match' r l of
-  Nothing -> if nullable r then Just [] else Nothing
-  x       -> x
+match r l =
+  case match' r l of
+    Nothing -> if nullable r then Just [] else Nothing
+    x       -> x
 
 search :: Eq c => Reg c -> [c] -> Maybe [c]
-search _ [] = Nothing
-search r l@(_:xs) = case match r l of
-  Nothing -> search r xs
-  Just a  -> Just a
+search _ []       = Nothing
+search r l@(_:xs) =
+  case match r l of
+    Nothing -> search r xs
+    Just a  -> Just a
 
 cutCovered :: Int -> [[c]] -> [[c]]
-cutCovered _ []     = []
+cutCovered _ [] = []
 cutCovered n (l:ls)
   | len_l < n = cutCovered (n - 1) ls
   | otherwise = l : cutCovered len_l ls
@@ -127,10 +128,11 @@ cutCovered n (l:ls)
     len_l = length l
 
 unpackMaybes :: [Maybe a] -> [a]
-unpackMaybes [] = []
-unpackMaybes (x:xs) = case x of
-  Nothing -> unpackMaybes xs
-  Just a  -> a : unpackMaybes xs
+unpackMaybes []     = []
+unpackMaybes (x:xs) =
+  case x of
+    Nothing -> unpackMaybes xs
+    Just a  -> a : unpackMaybes xs
 
 findall :: Eq c => Reg c -> [c] -> [[c]]
 findall r w = cutCovered 0 $ unpackMaybes $ map (match r) $ init $ tails w
@@ -145,9 +147,9 @@ string = foldr1 (:>) . map Lit
 alts :: [Char] -> Reg Char
 alts = foldr1 (:|) . map Lit
 
-letter = alts ['a'..'z'] :| alts ['A'..'Z']
-digit = alts ['0'..'9']
-number = digit :> Many digit
-ident = letter :> Many (letter :| digit)
+letter  = alts ['a'..'z'] :| alts ['A'..'Z']
+digit   = alts ['0'..'9']
+number  = digit :> Many digit
+ident   = letter :> Many (letter :| digit)
 
 many1 r = r :> Many r
