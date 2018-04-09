@@ -16,7 +16,7 @@ separator nonempty Arg "," ;
 
 -- statements ----------------------------------------------
 
-Block.     Block ::= "{{" [Stmt] "}}" ;
+Block.     Block ::= "{" [Stmt] "}" ;
 
 separator  Stmt "" ;
 
@@ -64,7 +64,7 @@ Int.       Type ::= "int" ;
 
 Str.       Type ::= "string" ;
 
-Bool.      Type ::= "boolean" ;
+Bool.      Type ::= "bool" ;
 
 Void.      Type ::= "void" ;
 
@@ -90,13 +90,13 @@ EApp.      Expr6 ::= Ident "(" [Expr] ")" ;
 
 EString.   Expr6 ::= String ;
 
+ENewArray. Expr6 ::= "[" Expr "]" ;
+
 EValArray. Expr6 ::= Ident "[" Expr "]" ;
 
-ENewArray. Expr6 ::= "[" Expr ", " Type "]" ;
+ENewDict.  Expr6 ::= "{}" ;
 
 EValDict.  Expr6 ::= Ident "{" Expr "}" ;
-
-ENewDict.  Expr6 ::= "{" Type ", " Type "}" ;
 
 Neg.       Expr5 ::= "-" Expr6 ;
 

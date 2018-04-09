@@ -1,0 +1,26 @@
+int addValues(int a, int b) {
+  return a + b;
+}
+
+int main () {
+  int a;
+  a = 21;
+  int b = 21;
+  int c = addValues(a, b);
+  bool equal = a + b == 42;
+  string success = "success!";
+
+  if (equal && c <= 42 && c >= 42) {
+    c--;
+    if (c > 42 || c < 42 && equal) {
+      equal = 0 == 1;
+      while (!equal) {
+        printString(success);
+        # prints success! once
+        equal = true;
+      }
+    }
+  }
+
+  return 0;
+}

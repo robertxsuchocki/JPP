@@ -1,0 +1,15 @@
+void zeroFirst(var int x, int y) {
+  x = 0;
+  y = 0;
+}
+int main () {
+  int x = 42;
+  int y = 42;
+  zeroFirst(x, y);
+  # x == 0 && y == 42
+  if (x + y == 42) {
+    printString("success!");
+    # prints success!
+  }
+  return 0;
+}

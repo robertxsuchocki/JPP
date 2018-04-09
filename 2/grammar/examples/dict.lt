@@ -1,0 +1,15 @@
+int main () {
+  {string, int} in_words;
+  in_words = {};
+  in_words{"forty two"} = 42;
+  if (hasKey(in_words, "forty two")) {
+    deleteKey(in_words, "forty two");
+    in_words{"success!"} = 42;
+  }
+  # would produce an error in case key is not in dict
+  if (in_words{"success!"} == 42) {
+    printString("success!");
+    # prints success! instead
+  }
+  return 0;
+}

@@ -1,0 +1,22 @@
+int main () {
+  int squared(var int x) {
+    int power(int x, int y) {
+      int result = 1;
+      if (y >= 1) {
+        for i = 1..y do {
+          result = result * x;
+        }
+      }
+      return result;
+    }
+    x = power(x, 2);
+  }
+  int x = 6;
+  squared(x);
+  # x == 36
+  if (x + 6 == 42) {
+    printString("success!")
+    # prints success!
+  }
+  return 0;
+}
