@@ -8,11 +8,11 @@ FnDef.	   TopDef ::= Type Ident "(" [Arg] ")" Block ;
 
 separator nonempty TopDef "" ;
 
-NoVar.     Arg ::= Type Ident;
+ArgVal.    Arg ::= Type Ident;
 
-Var.       Arg ::= "var" Type Ident;
+ArgVar.    Arg ::= "var" Type Ident;
 
-separator nonempty Arg "," ;
+separator  Arg "," ;
 
 -- statements ----------------------------------------------
 
@@ -62,7 +62,7 @@ SExp.      Stmt ::= Expr  ";" ;
 
 Int.       Type ::= "int" ;
 
-Str.       Type ::= "string" ;
+Str.       Type ::= "str" ;
 
 Bool.      Type ::= "bool" ;
 
@@ -147,3 +147,4 @@ comment    "#" ;
 comment    "//" ;
 
 comment    "/*" "*/" ;
+
