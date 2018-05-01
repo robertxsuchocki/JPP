@@ -1,0 +1,16 @@
+int main () {
+  int x = 1000;
+  int y = 10;
+  while (y) {
+    if (x) {
+      ;
+      int x = -1;
+      y = y + x;
+    } else {
+      ;
+      int x = 1;
+      y = y - x;
+    }
+    x = x + y;
+  }
+}
