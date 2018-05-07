@@ -16,7 +16,9 @@ separator  Arg "," ;
 
 -- statements ----------------------------------------------
 
-Block.     Block ::= "{" [Stmt] "}" ;
+Block.     Block ::= "{" [Decl] [Stmt] "}" ;
+
+separator  Decl "" ;
 
 separator  Stmt "" ;
 
@@ -24,15 +26,13 @@ Empty.     Stmt ::= ";" ;
 
 BStmt.     Stmt ::= Block ;
 
-Decl.      Stmt ::= Type [Item] ";" ;
+VarDecl.   Decl ::= Type Item ";" ;
 
-FunDecl.   Stmt ::= Type Ident "(" [Arg] ")" Stmt ;
+FunDecl.   Decl ::= Type Ident "(" [Arg] ")" Block ;
 
 NoInit.    Item ::= Ident ;
 
 Init.      Item ::= Ident "=" Expr ;
-
-separator nonempty Item "," ;
 
 Ass.       Stmt ::= Ident "=" Expr  ";" ;
 
@@ -147,4 +147,3 @@ comment    "#" ;
 comment    "//" ;
 
 comment    "/*" "*/" ;
-
