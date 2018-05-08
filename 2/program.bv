@@ -1,13 +1,17 @@
 int main () {
   int x = 1000;
   int y = 10;
-  while (y) {
-    if (x) {
-      int x = -1;
-      y = y + x;
+  void a(int x) {
+    y = y + x;
+  }
+  void b(int x) {
+    y = y - x;
+  }
+  while (y > 0) {
+    if (x != 0) {
+      a(-1);
     } else {
-      int x = 1;
-      y = y - x;
+      b(1);
     }
     x = x + y;
   }

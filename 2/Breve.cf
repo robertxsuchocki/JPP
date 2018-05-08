@@ -8,9 +8,7 @@ FnDef.	   TopDef ::= Type Ident "(" [Arg] ")" Block ;
 
 separator nonempty TopDef "" ;
 
-ArgVal.    Arg ::= Type Ident;
-
-ArgVar.    Arg ::= "var" Type Ident;
+Arg.       Arg ::= Type Ident;
 
 separator  Arg "," ;
 
@@ -35,10 +33,6 @@ NoInit.    Item ::= Ident ;
 Init.      Item ::= Ident "=" Expr ;
 
 Ass.       Stmt ::= Ident "=" Expr  ";" ;
-
-Incr.      Stmt ::= Ident "++"  ";" ;
-
-Decr.      Stmt ::= Ident "--"  ";" ;
 
 ArrayAss.  Stmt ::= Ident "[" Expr "]" "=" Expr  ";" ;
 
@@ -78,6 +72,10 @@ separator  Type "," ;
 
 -- Expressions ---------------------------------------------
 
+Incr.      Expr7 ::= Ident "++" ;
+
+Decr.      Expr7 ::= Ident "--" ;
+
 EVar.      Expr6 ::= Ident ;
 
 ELitInt.   Expr6 ::= Integer ;
@@ -112,7 +110,7 @@ EAnd.      Expr1 ::= Expr2 "&&" Expr1 ;
 
 EOr.       Expr ::= Expr1 "||" Expr ;
 
-coercions  Expr 6 ;
+coercions  Expr 7 ;
 
 separator  Expr "," ;
 

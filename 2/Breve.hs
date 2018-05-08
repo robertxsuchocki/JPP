@@ -13,11 +13,17 @@ import qualified Data.Map as M
 
 import Data.Maybe
 
-type Loc = Integer
+data Value = VVoid | VInt Integer | VBool Bool
+           | VString String | VFunc Env [Arg] Block
+  deriving (Eq, Ord, Show, Read)
+
+type Op a b = a -> a -> b
 
 type Env = M.Map String Loc
 
-type Store = M.Map Loc Integer
+type Loc = Integer
+
+type Store = M.Map Loc Value
 
 type RR a = ReaderT Env (State Store) a
 
@@ -26,12 +32,15 @@ alloc = do
   st <- get
   if (M.null st)
     then return 0
-    else let (i, v) = M.findMax st in return (i + 1)
+    else let (loc, value) = M.findMax st in return (loc + 1)
 
 
-transIdent :: Ident -> RR ()
-transIdent x = case x of
-  Ident string -> return ()
+transIdent :: Ident -> RR Value
+transIdent (Ident ident) = do
+  env   <- ask
+  store <- get
+  let loc = fromMaybe (error "undefined variable") (M.lookup ident env)
+  return $ fromMaybe (error "unitialized variable") (M.lookup loc store)
 
 
 transProgram :: Program -> RR ()
@@ -40,33 +49,35 @@ transProgram (Program (topdef:_)) = do
 
 
 transTopDef :: TopDef -> RR ()
-transTopDef (FnDef _ _ _ b) = do
-  transBlock b
+transTopDef (FnDef _ _ _ block) = do
+  transBlock block
 
 
-transArg :: Arg -> RR ()
-transArg x = case x of
-  ArgVal type_ ident -> return ()
-  ArgVar type_ ident -> return ()
+transArg :: [(Arg, Expr)] -> RR Env
+
+transArg [] = do
+  env <- ask
+  return env
+
+transArg (((Arg _ (Ident ident)), expr):args) = do
+  env   <- ask
+  loc   <- alloc
+  value <- transExpr expr
+  modify (M.insert loc value)
+  local (M.insert ident loc) (transArg args)
 
 
 transBlock :: Block -> RR ()
 
-transBlock (Block _ []) = return ()
+transBlock (Block (d:ds) ss) = do
+  env <- transDecl d
+  local (env) (transBlock (Block ds ss))
 
 transBlock (Block [] (s:ss)) = do
   transStmt s
   transBlock (Block [] ss)
 
-transBlock (Block ((VarDecl t (NoInit (Ident x))):ds) ss) = do
-  l <- alloc
-  local (M.insert x l) (transBlock (Block ds ss))
-
-transBlock (Block ((VarDecl t (Init (Ident x) e)):ds) ss) = do
-  l <- alloc
-  v <- transExpr e
-  modify (M.insert l v)
-  local (M.insert x l) (transBlock (Block ds ss))
+transBlock (Block _ []) = return ()
 
 
 transStmt :: Stmt -> RR ()
@@ -81,47 +92,57 @@ transStmt (Ass (Ident ident) expr) = do
   let loc = fromMaybe (error "undefined variable") (M.lookup ident env)
   modify (M.insert loc value)
 
+transStmt (Cond expr stmt) = do transStmt (CondElse expr stmt Empty)
+
 transStmt (CondElse expr stmt1 stmt2) = do
-  value <- transExpr expr
-  if value /= 0
+  (VBool value) <- transExpr expr
+  if value
     then transStmt stmt1
     else transStmt stmt2
 
 transStmt (While expr stmt) = do
+  let stmt' = BStmt (Block [] [stmt, (While expr stmt)])
+  transStmt (CondElse expr stmt' Empty)
+
+transStmt (SExp expr) = do
   value <- transExpr expr
-  if value == 0
-    then return ()
-    else do
-      transStmt stmt
-      transStmt (While expr stmt)
+  return ()
 
 transStmt x = case x of
   -- Empty -> return ()
   -- BStmt block -> return ()
   -- Ass ident expr -> return ()
-  Incr ident -> return ()
-  Decr ident -> return ()
   ArrayAss ident expr1 expr2 -> return ()
   DictAss ident expr1 expr2 -> return ()
   Ret expr -> return ()
   VRet -> return ()
-  Cond expr stmt -> return ()
+  -- Cond expr stmt -> return ()
   -- CondElse expr stmt1 stmt2 -> return ()
   -- While expr stmt -> return ()
   For ident expr1 expr2 stmt -> return ()
-  SExp expr -> return ()
+  -- SExp expr -> return ()
 
 
-transDecl :: Decl -> RR ()
-transDecl x = case x of
-  VarDecl type_ item -> return ()
-  FunDecl type_ ident args block -> return ()
+transDecl :: Decl -> RR (Env -> Env)
 
+transDecl (VarDecl _ (NoInit (Ident ident))) = do
+  env <- ask
+  loc <- alloc
+  modify (M.insert loc VVoid)
+  return (M.insert ident loc)
 
-transItem :: Item -> RR ()
-transItem x = case x of
-  NoInit ident -> return ()
-  Init ident expr -> return ()
+transDecl (VarDecl _ (Init (Ident ident) expr)) = do
+  env   <- ask
+  loc   <- alloc
+  value <- transExpr expr
+  modify (M.insert loc value)
+  return (M.insert ident loc)
+
+transDecl (FunDecl _ (Ident ident) args block) = do
+  env  <- ask
+  loc  <- alloc
+  modify (M.insert loc (VFunc (M.insert ident loc env) args block))
+  return (M.insert ident loc)
 
 
 transType :: Type -> RR ()
@@ -135,93 +156,132 @@ transType x = case x of
   Fun type_ types -> return ()
 
 
-transExpr :: Expr -> RR Integer
+transExpr :: Expr -> RR Value
 
-transExpr (EVar (Ident ident)) = do
-  env   <- ask
-  store <- get
+transExpr (Incr (Ident ident)) = do
+  env <- ask
   let loc = fromMaybe (error "undefined variable") (M.lookup ident env)
-  return $ fromMaybe (error "unitialized variable") (M.lookup loc store)
+  (VInt value) <- transIdent (Ident ident)
+  modify (M.insert loc (VInt (value + 1)))
+  return (VInt value)
 
-transExpr (ELitInt integer) = return integer
+transExpr (Decr (Ident ident)) = do
+  env <- ask
+  let loc = fromMaybe (error "undefined variable") (M.lookup ident env)
+  (VInt value) <- transIdent (Ident ident)
+  modify (M.insert loc (VInt (value - 1)))
+  return (VInt value)
 
-transExpr (ELitTrue) = return 1
+transExpr (EVar ident) = do
+  value <- transIdent ident
+  return value
 
-transExpr (ELitFalse) = return 0
+transExpr (ELitInt integer) = return (VInt integer)
+
+transExpr (ELitTrue) = return (VBool True)
+
+transExpr (ELitFalse) = return (VBool False)
+
+transExpr (EApp ident exprs) = do
+  (VFunc env args block) <- transIdent ident
+  env' <- local (\_ -> env) (transArg (zip args exprs))
+  local (\_ -> env') (transBlock block)
+  return (VInt 0)
+
+transExpr (EString string) = return (VString string)
 
 transExpr (Neg expr) = do
-  value <- transExpr expr
-  return (-value)
+  (VInt value) <- transExpr expr
+  return (VInt (-value))
+
+transExpr (Not expr) = do
+  (VBool value) <- transExpr expr
+  return (VBool (not value))
 
 transExpr (EMul expr1 mulop expr2) = do
-  value1 <- transExpr expr1
-  value2 <- transExpr expr2
-  let mulop' = case mulop of Times -> (*)
-                             Div   -> div
-                             Mod   -> mod
-  return (mulop' value1 value2)
+  (VInt value1) <- transExpr expr1
+  (VInt value2) <- transExpr expr2
+  op <- transMulOp mulop
+  return (VInt (op value1 value2))
 
 transExpr (EAdd expr1 addop expr2) = do
-  value1 <- transExpr expr1
-  value2 <- transExpr expr2
-  let addop' = case addop of Plus  -> (+)
-                             Minus -> (-)
-  return (addop' value1 value2)
+  (VInt value1) <- transExpr expr1
+  (VInt value2) <- transExpr expr2
+  op <- transAddOp addop
+  return (VInt (op value1 value2))
+
+transExpr (ERel expr1 relop expr2) = do
+  (VInt value1) <- transExpr expr1
+  (VInt value2) <- transExpr expr2
+  op <- transRelOp relop
+  return (VBool (op value1 value2))
+
+transExpr (EAnd expr1 expr2) = do
+  (VBool value1) <- transExpr expr1
+  (VBool value2) <- transExpr expr2
+  return (VBool ((&&) value1 value2))
+
+transExpr (EOr expr1 expr2) = do
+  (VBool value1) <- transExpr expr1
+  (VBool value2) <- transExpr expr2
+  return (VBool ((||) value1 value2))
 
 transExpr x = case x of
-  -- EVar ident -> return 0
-  -- ELitInt integer -> return 0
-  -- ELitTrue -> return 0
-  -- ELitFalse -> return 0
-  EApp ident exprs -> return 0
-  EString string -> return 0
-  ENewArray expr -> return 0
-  EValArray ident expr -> return 0
-  ENewDict -> return 0
-  EValDict ident expr -> return 0
-  -- Neg expr -> return 0
-  Not expr -> return 0
-  -- EMul expr1 mulop expr2 -> return 0
-  -- EAdd expr1 addop expr2 -> return 0
-  ERel expr1 relop expr2 -> return 0
-  EAnd expr1 expr2 -> return 0
-  EOr expr1 expr2 -> return 0
+  -- Incr expr -> return (VInt 0)
+  -- Decr expr -> return (VInt 0)
+  -- EVar ident -> return (VInt 0)
+  -- ELitInt integer -> return (VInt 0)
+  -- ELitTrue -> return (VInt 0)
+  -- ELitFalse -> return (VInt 0)
+  -- EApp ident exprs -> return (VInt 0)
+  -- EString string -> return (VInt 0)
+  ENewArray expr -> return (VInt 0)
+  EValArray ident expr -> return (VInt 0)
+  ENewDict -> return (VInt 0)
+  EValDict ident expr -> return (VInt 0)
+  -- Neg expr -> return (VInt 0)
+  -- Not expr -> return (VInt 0)
+  -- EMul expr1 mulop expr2 -> return (VInt 0)
+  -- EAdd expr1 addop expr2 -> return (VInt 0)
+  -- ERel expr1 relop expr2 -> return (VInt 0)
+  -- EAnd expr1 expr2 -> return (VInt 0)
+  -- EOr expr1 expr2 -> return (VInt 0)
 
 
-transAddOp :: AddOp -> RR ()
+transAddOp :: AddOp -> RR (Op Integer Integer)
 transAddOp x = case x of
-  Plus -> return ()
-  Minus -> return ()
+  Plus  -> return (+)
+  Minus -> return (-)
 
 
-transMulOp :: MulOp -> RR ()
+transMulOp :: MulOp -> RR (Op Integer Integer)
 transMulOp x = case x of
-  Times -> return ()
-  Div -> return ()
-  Mod -> return ()
+  Times -> return (*)
+  Div   -> return div
+  Mod   -> return mod
 
 
-transRelOp :: RelOp -> RR ()
+transRelOp :: RelOp -> RR (Op Integer Bool)
 transRelOp x = case x of
-  LTH -> return ()
-  LE -> return ()
-  GTH -> return ()
-  GE -> return ()
-  EQU -> return ()
-  NE -> return ()
+  LTH -> return (<)
+  LE  -> return (<=)
+  GTH -> return (>)
+  GE  -> return (>=)
+  EQU -> return (==)
+  NE  -> return (/=)
 
 
 execProg :: Program -> String
-execProg s = concat $ map printPair $ M.toList $
-              execState (runReaderT (transProgram s) M.empty) M.empty
+execProg prog = concat $ map printPair $ M.toList $
+              execState (runReaderT (transProgram prog) M.empty) M.empty
   where
-    printPair :: (Integer, Integer) -> String
-    printPair (l, i) = (show l) ++ ", " ++ (show i) ++ "\n"
+    printPair :: (Integer, Value) -> String
+    printPair (loc, value) = (show loc) ++ ", " ++ (show value) ++ "\n"
 
 main = do
   interact breve
   putStrLn ""
 
-breve s =
-  let Ok e = pProgram (myLexer s)
-  in (execProg e)
+breve code =
+  let Ok prog = pProgram (myLexer code)
+  in (execProg prog)
