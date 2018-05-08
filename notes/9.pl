@@ -40,3 +40,11 @@ element(E, [E|_]).
 element(E, [_|L]) :- element(E, L).
 
 costam(X, L) :- element(X, L), plus(X, s(z), s(s(s(z)))) % X e L, X + 1 = 3
+
+fib(z, s(z)).
+fib(s(z), s(z)).
+fib(s(s(X)), W) :- fib(s(X), Y), fib(X, Z), plus(Y, Z, W).
+
+scal([], L2, L2).
+scal([X|L], L2, [X|W]) :- scal(L, L2, W).
+
