@@ -42,6 +42,8 @@ Ret.       Stmt ::= "return" Expr ";" ;
 
 VRet.      Stmt ::= "return" ";" ;
 
+Print.     Stmt ::= "print(" Expr ")" ;
+
 Cond.      Stmt ::= "if" "(" Expr ")" Stmt  ;
 
 CondElse.  Stmt ::= "if" "(" Expr ")" Stmt "else" Stmt  ;
@@ -75,6 +77,10 @@ separator  Type "," ;
 Incr.      Expr7 ::= Ident "++" ;
 
 Decr.      Expr7 ::= Ident "--" ;
+
+EIntStr.   Expr7 ::= "toStr(" Expr6 ")" ;
+
+EStrInt.   Expr7 ::= "toInt(" Expr6 ")" ;
 
 EVar.      Expr6 ::= Ident ;
 

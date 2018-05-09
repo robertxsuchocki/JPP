@@ -1,13 +1,21 @@
 int main () {
   int x = 1000;
   int y = 10;
+  int res;
   void a(int x) {
     y = y + x;
   }
   void b(int x) {
     y = y - x;
   }
-  while (y > 0) {
+  int fac(int x) {
+    if (x <= 1) {
+      return 1;
+    } else {
+      return x * fac(x-1);
+    }
+  }
+  for i = 1..10 do {
     if (x != 0) {
       a(-1);
     } else {
@@ -15,4 +23,8 @@ int main () {
     }
     x = x + y;
   }
+  print(x);
+  res = fac(10);
+  print(res);
+  print(toInt("40") + toInt("2"));
 }
