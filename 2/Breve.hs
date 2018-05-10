@@ -1,8 +1,9 @@
 module Main where
 
+import AbsBreve
 import LexBreve
 import ParBreve
-import AbsBreve
+-- import TypeBreve
 import ErrM
 
 import Control.Monad.State
@@ -328,4 +329,6 @@ execProg prog = do -- void (execStateT (runReaderT (transProgram prog) M.empty) 
 main :: IO ()
 main = do
   code <- getContents
-  let Ok prog = pProgram (myLexer code) in (execProg prog)
+  let prog = pProgram (myLexer code)
+  case prog of (Ok tree) -> execProg tree
+               _         -> print "Parse failed"
