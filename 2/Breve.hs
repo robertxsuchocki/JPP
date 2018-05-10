@@ -38,11 +38,21 @@ forStep :: Loc -> Integer -> Integer -> Stmt -> RR ()
 forStep loc value1 value2 stmt = do
   modify (M.insert loc (VInt value1))
   transStmt stmt
-  if (value1 == value2)
+  returned <- checkReturnStatus
+  if (value1 == value2) || returned
     then return ()
     else do
       let diff = signum (value2 - value1)
       forStep loc (value1 + diff) value2 stmt
+
+checkReturnStatus :: RR Bool
+checkReturnStatus = do
+  env   <- ask
+  store <- get
+  let loc   = fromMaybe 0 (M.lookup "return" env)
+  let value = fromMaybe VNothing (M.lookup loc store)
+  case value of VNothing -> return False
+                _        -> return True
 
 
 transIdent :: Ident -> RR Value
@@ -86,7 +96,10 @@ transBlock (Block (d:ds) ss) = do
 
 transBlock (Block [] (s:ss)) = do
   transStmt s
-  transBlock (Block [] ss)
+  returned <- checkReturnStatus
+  if (not returned)
+    then transBlock (Block [] ss)
+    else return ()
 
 transBlock (Block _ []) = return ()
 
@@ -127,8 +140,15 @@ transStmt (CondElse expr stmt1 stmt2) = do
     else transStmt stmt2
 
 transStmt (While expr stmt) = do
-  let stmt' = BStmt (Block [] [stmt, (While expr stmt)])
-  transStmt (CondElse expr stmt' Empty)
+  (VBool value) <- transExpr expr
+  if value
+    then do
+      transStmt stmt
+      returned <- checkReturnStatus
+      if (not returned)
+        then transStmt (While expr stmt)
+        else do return ()
+    else do return ()
 
 transStmt (For (Ident ident) expr1 expr2 stmt) = do
   (VInt value1) <- transExpr expr1
@@ -212,13 +232,18 @@ transExpr (ELitTrue) = return (VBool True)
 transExpr (ELitFalse) = return (VBool False)
 
 transExpr (EApp ident exprs) = do
-  (VFunc env args block) <- transIdent ident
+  store  <- get
   values <- mapM transExpr exprs
+  (VFunc env args block) <- transIdent ident
+
   env'   <- local (\_ -> env) (transArg (zip args values))
   local (\_ -> env') (transBlock block)
-  store  <- get
+
+  store' <- get
+  modify (\_ -> M.intersection store' store)
+
   let loc   = fromMaybe 0 (M.lookup "return" env)
-  let value = fromMaybe VVoid (M.lookup loc store)
+  let value = fromMaybe VVoid (M.lookup loc store')
   modify (M.insert loc VNothing)
   return value
 
@@ -291,7 +316,14 @@ transRelOp x = case x of
 
 
 execProg :: Program -> IO ()
-execProg prog = do void (execStateT (runReaderT (transProgram prog) M.empty) M.empty)
+execProg prog = do -- void (execStateT (runReaderT (transProgram prog) M.empty) M.empty)
+  state <- execStateT (runReaderT (transProgram prog) M.empty) M.empty
+  printPairs $ M.toList $ state
+    where
+      printPairs []     = putStr ""
+      printPairs (p:ps) = do
+        putStrLn (show p)
+        printPairs ps
 
 main :: IO ()
 main = do
