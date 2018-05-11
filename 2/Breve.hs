@@ -3,7 +3,7 @@ module Main where
 import AbsBreve
 import LexBreve
 import ParBreve
--- import TypeBreve
+import TypeBreve
 import ErrM
 
 import Control.Monad.State
@@ -83,7 +83,6 @@ transArg [] = do
   return env
 
 transArg (((Arg _ (Ident ident)), value):args) = do
-  env   <- ask
   loc   <- alloc
   modify (M.insert loc value)
   local (M.insert ident loc) (transArg args)
@@ -92,8 +91,8 @@ transArg (((Arg _ (Ident ident)), value):args) = do
 transBlock :: Block -> RR ()
 
 transBlock (Block (d:ds) ss) = do
-  env <- transDecl d
-  local (env) (transBlock (Block ds ss))
+  env_f <- transDecl d
+  local (env_f) (transBlock (Block ds ss))
 
 transBlock (Block [] (s:ss)) = do
   transStmt s
@@ -168,13 +167,11 @@ transStmt x = case x of
 transDecl :: Decl -> RR (Env -> Env)
 
 transDecl (VarDecl _ (NoInit (Ident ident))) = do
-  env <- ask
   loc <- alloc
   modify (M.insert loc VVoid)
   return (M.insert ident loc)
 
 transDecl (VarDecl _ (Init (Ident ident) expr)) = do
-  env   <- ask
   loc   <- alloc
   value <- transExpr expr
   modify (M.insert loc value)
@@ -317,18 +314,18 @@ transRelOp x = case x of
 
 
 execProg :: Program -> IO ()
-execProg prog = do -- void (execStateT (runReaderT (transProgram prog) M.empty) M.empty)
-  state <- execStateT (runReaderT (transProgram prog) M.empty) M.empty
-  printPairs $ M.toList $ state
-    where
-      printPairs []     = putStr ""
-      printPairs (p:ps) = do
-        putStrLn (show p)
-        printPairs ps
+execProg prog =
+  do void (execStateT (runReaderT (transProgram prog) M.empty) M.empty)
+
 
 main :: IO ()
 main = do
   code <- getContents
   let prog = pProgram (myLexer code)
-  case prog of (Ok tree) -> execProg tree
-               _         -> print "Parse failed"
+  case prog of
+    (Ok tree) -> do
+      valid <- runReaderT (validProgram tree) M.empty
+      if (not valid)
+        then do return ()
+        else do execProg tree
+    _ -> print "Parse failed"

@@ -2,7 +2,7 @@ module TypeBreve where
 
 import AbsBreve
 
-import Control.Monad.State
+import Control.Monad.Trans
 import Control.Monad.Trans.Reader
 
 import Data.Map (Map, (!))
@@ -10,236 +10,262 @@ import qualified Data.Map as M
 
 import Data.Maybe
 
-type Op a b = a -> a -> b
+type TypeEnv = M.Map String Type
 
-type Env = M.Map String Type
-
-type RR a = ReaderT Env IO a
+type RIO a = (ReaderT TypeEnv IO) a
 
 
-validIdent :: Ident -> Type -> RR Bool
+validProgram :: Program -> RIO Bool
+validProgram (Program (topdef:_)) = do
+  valid <- validTopDef topdef
+  return valid
+
+
+validTopDef :: TopDef -> RIO Bool
+validTopDef (FnDef _ _ _ block) = do
+  valid <- validBlock block
+  return valid
+
+
+validIdent :: Ident -> Type -> RIO Bool
 validIdent (Ident ident) type_ = do
   env <- ask
-  let type_ = M.lookup ident env
-  case type_ of Nothing  -> return False
-                (Just t) -> return t == type_
+  case M.lookup ident env of
+    Just t -> do
+      return (t == type_)
+    _ -> do
+      return False
 
 
-validProgram :: Program -> RR Bool
-validProgram (Program (topdef:_)) = do
-  validTopDef topdef
+validBlock :: Block -> RIO Bool
+
+validBlock (Block (d:ds) ss) = do
+  env <- validDecl d
+  if (M.null env)
+    then do
+      liftIO $ print $ "Typing failed in declaration: " ++ (show d)
+      return False
+    else do
+      valid <- local (\_ -> env) (validBlock (Block ds ss))
+      return valid
+
+validBlock (Block [] (s:ss)) = do
+  valid <- validStmt s
+  if (valid)
+    then do
+      valid <- validBlock (Block [] ss)
+      return valid
+    else do
+      liftIO $ print $ "Typing failed in statement: " ++ (show s)
+      return False
+
+validBlock (Block _ []) = return True
 
 
-validTopDef :: TopDef -> RR Bool
-validTopDef (FnDef _ _ _ block) = do
-  validBlock block
+validDecl :: Decl -> RIO TypeEnv
+
+validDecl (VarDecl type_ (NoInit (Ident ident))) = do
+  env <- ask
+  return (M.insert ident type_ env)
+
+validDecl (VarDecl type_ (Init (Ident ident) expr)) = do
+  env   <- ask
+  valid <- validExpr type_ expr
+  if valid
+    then do
+      return (M.insert ident type_ env)
+    else do
+      return M.empty
+
+validDecl (FunDecl type_ (Ident ident) args block) = do
+  env   <- ask
+  env'  <- argsDecl args
+  let fun = (Fun type_ (argsToTypes args))
+  let env'' = (M.insert "return" type_ (M.insert ident fun env'))
+  valid <- local (\_ -> env'') (validBlock block)
+  if valid
+    then do
+      return (M.insert ident fun env)
+    else do
+      return M.empty
 
 
--- validArg :: [(Arg, Value)] -> RR Env
---
--- validArg [] = do
---   env <- ask
---   return env
---
--- validArg (((Arg _ (Ident ident)), value):args) = do
---   env   <- ask
---   local (M.insert ident type_) (validArg args)
+argsDecl :: [Arg] -> RIO TypeEnv
+
+argsDecl [] = do
+  env <- ask
+  return env
+
+argsDecl ((Arg type_ (Ident ident)):args) = do
+  local (M.insert ident type_) (argsDecl args)
 
 
--- validBlock :: Block -> RR ()
---
--- validBlock (Block (d:ds) ss) = do
---   env <- validDecl d
---   local (env) (validBlock (Block ds ss))
---
--- validBlock (Block [] (s:ss)) = do
---   validStmt s
---   returned <- validReturnStatus
---   if (not returned)
---     then validBlock (Block [] ss)
---     else return ()
---
--- validBlock (Block _ []) = return ()
+argsToTypes :: [Arg] -> [Type]
+
+argsToTypes [] = []
+argsToTypes ((Arg type_ _):args) = type_ : (argsToTypes args)
 
 
-validStmt :: Stmt -> RR ()
+validArgs :: [Type] -> [Expr] -> RIO Bool
 
-validStmt Empty = True
+validArgs [] [] = do
+  return True
+
+validArgs (type_:types) (expr:exprs) = do
+  valid <- validExpr type_ expr
+  if (not valid)
+    then do
+      return False
+    else do
+      valid' <- validArgs types exprs
+      return valid'
+
+validArgs _ _ = do
+  return False
+
+
+validStmt :: Stmt -> RIO Bool
+
+validStmt Empty = do
+  return True
 
 validStmt (BStmt block) = do
-  validBlock block
+  valid <- validBlock block
+  return valid
 
 validStmt (Ass (Ident ident) expr) = do
   env <- ask
-  let type_ = M.lookup ident env
-  case type_ of Nothing     -> return False
-                (Just Int)  -> return transInt expr
-                (Just Bool) -> return transBool expr
-                (Just Str)  -> return transStr expr
+  case M.lookup ident env of
+    Just type' -> do
+      valid <- validExpr type' expr
+      return valid
+    _ -> do
+      return False
 
 validStmt (Ret expr) = do
-  validStmt (Ass (Ident "return") expr)
+  valid <- validStmt (Ass (Ident "return") expr)
+  return valid
 
 validStmt (VRet) = do
-  validIdent (Ident "return") Void
+  valid <- validIdent (Ident "return") Void
+  return valid
 
 validStmt (Print expr) = do
-  return True
+  valid_i <- validExpr Int expr
+  valid_b <- validExpr Bool expr
+  valid_s <- validExpr Str expr
+  valid_v <- validExpr Void expr
+  return (valid_i || valid_b || valid_s || valid_v)
 
 validStmt (Cond expr stmt) = do
-  validStmt (CondElse expr stmt Empty)
+  valid_e <- validExpr Bool expr
+  valid_s <- validStmt stmt
+  return (valid_e && valid_s)
 
 validStmt (CondElse expr stmt1 stmt2) = do
-  validBool expr
-  validStmt stmt1
-  validStmt stmt2
+  valid_e  <- validExpr Bool expr
+  valid_s1 <- validStmt stmt1
+  valid_s2 <- validStmt stmt2
+  return (valid_e && valid_s1 && valid_s2)
 
 validStmt (While expr stmt) = do
-  validBool expr
-  validStmt stmt
+  valid_e <- validExpr Bool expr
+  valid_s <- validStmt stmt
+  return (valid_e && valid_s)
 
 validStmt (For (Ident ident) expr1 expr2 stmt) = do
-  validInt expr1
-  validInt expr2
-  validStmt stmt
+  valid_e1 <- validExpr Int expr1
+  valid_e2 <- validExpr Int expr2
+  valid_s  <- validStmt stmt
+  return (valid_e1 && valid_e2 && valid_s)
 
 validStmt (SExp expr) = do
-  validExpr expr
+  valid_i <- validExpr Int expr
+  valid_b <- validExpr Bool expr
+  valid_s <- validExpr Str expr
+  valid_v <- validExpr Void expr
+  return (valid_i || valid_b || valid_s || valid_v)
 
-validStmt x = case x of
-  ArrayAss ident expr1 expr2 -> return ()
-  DictAss ident expr1 expr2 -> return ()
+
+validExpr :: Type -> Expr -> RIO Bool
+
+validExpr type_ (EVar ident) = do
+  valid <- validIdent ident type_
+  return valid
+
+validExpr type_ (EApp (Ident ident) exprs) = do
+  env <- ask
+  case M.lookup ident env of
+    Just (Fun t args) -> do
+      valid_a <- validArgs args exprs
+      return (t == type_ && valid_a)
+    _ -> do
+      return False
 
 
-validDecl :: Decl -> RR Bool
-
-validDecl (VarDecl type_ (NoInit (Ident ident))) = do
+validExpr Int (ELitInt integer) = do
   return True
 
-validDecl (VarDecl type_ (Init (Ident ident) expr)) = do
-  case type_ of Int  -> validInt expr
-                Bool -> validBool expr
-                Str  -> validStr expr
-                _    -> return False
+validExpr Int (Incr ident) = do
+  valid <- validIdent ident Int
+  return valid
 
-validDecl (FunDecl type_ (Ident ident) args block) = do
-  validArgs args
+validExpr Int (Decr ident) = do
+  valid <- validIdent ident Int
+  return valid
 
+validExpr Int (EStrInt expr) = do
+  valid <- validExpr Str expr
+  return valid
 
-validType :: Type -> RR ()
-validType x = case x of
-  Int -> return ()
-  Str -> return ()
-  Bool -> return ()
-  Void -> return ()
-  Array type_ -> return ()
-  Dict type_1 type_2 -> return ()
-  Fun type_ types -> return ()
+validExpr Int (Neg expr) = do
+  valid <- validExpr Int expr
+  return valid
 
+validExpr Int (EMul expr1 mulop expr2) = do
+  valid1 <- validExpr Int expr1
+  valid2 <- validExpr Int expr2
+  return (valid1 && valid2)
 
--- validExpr :: Expr -> RR Bool
---
--- validExpr (EApp ident exprs) = do
---   values <- mapM validExpr exprs
---   (VFunc env args block) <- validIdent ident VFunc
---
---   env'   <- local (\_ -> env) (validArg (zip args values))
---   local (\_ -> env') (validBlock block)
---
---   let type_ = fromMaybe 0 (M.lookup "return" env)
---   modify (M.insert type_ VNothing)
---   return value
+validExpr Int (EAdd expr1 addop expr2) = do
+  valid1 <- validExpr Int expr1
+  valid2 <- validExpr Int expr2
+  return (valid1 && valid2)
 
 
-validInt :: Expr -> RR Bool
-
-validInt (ELitInt integer) = do
+validExpr Bool (ELitTrue) = do
   return True
 
-validInt (EVar ident) = do
-  validIdent ident Int
+validExpr Bool (ELitFalse) = do
+  return True
 
-validInt (Incr (Ident ident)) = do
-  validIdent ident Int
+validExpr Bool (Not expr) = do
+  valid <- validExpr Bool expr
+  return valid
 
-validInt (Decr (Ident ident)) = do
-  validIdent ident Int
+validExpr Bool (ERel expr1 relop expr2) = do
+  valid1 <- validExpr Int expr1
+  valid2 <- validExpr Int expr2
+  return (valid1 && valid2)
 
-validInt (EStrInt expr) = do
-  validStr expr
+validExpr Bool (EAnd expr1 expr2) = do
+  valid1 <- validExpr Bool expr1
+  valid2 <- validExpr Bool expr2
+  return (valid1 && valid2)
 
-validInt (Neg expr) = do
-  validInt expr
+validExpr Bool (EOr expr1 expr2) = do
+  valid1 <- validExpr Bool expr1
+  valid2 <- validExpr Bool expr2
+  return (valid1 && valid2)
 
-validInt (EMul expr1 mulop expr2) = do
-  validInt expr1
-  validInt expr2
 
-validInt (EAdd expr1 addop expr2) = do
-  validInt expr1
-  validInt expr2
+validExpr Str (EString string) = do
+  return True
 
-validInt _ = do
+validExpr Str (EIntStr expr) = do
+  valid <- validExpr Int expr
+  return valid
+
+
+validExpr type_ expr = do
   return False
-
-
-validBool :: Expr -> RR Bool
-
-validBool (ELitTrue) = do
-  return True
-
-validBool (ELitFalse) = do
-  return True
-
-validBool (EVar ident) = do
-  validIdent ident Bool
-
-validBool (Not expr) = do
-  validBool expr
-
-validBool (ERel expr1 relop expr2) = do
-  validInt expr1
-  validInt expr2
-
-validBool (EAnd expr1 expr2) = do
-  validBool expr1
-  validBool expr2
-
-validBool (EOr expr1 expr2) = do
-  validBool expr1
-  validBool expr2
-
-validBool _ = do
-  return False
-
-
-validStr :: Expr -> RR Bool
-
-validStr (EString string) = do
-  return True
-
-validStr (EVar ident) = do
-  validIdent ident Str
-
-validStr (EIntStr expr) = do
-  validInt expr
-
-validStr _ = do
-  return False
-
-
-execProg :: Program -> IO ()
-execProg prog = do -- void (execStateT (runReaderT (validProgram prog) M.empty) M.empty)
-  state <- execStateT (runReaderT (validProgram prog) M.empty) M.empty
-  printPairs $ M.toList $ state
-    where
-      printPairs []     = putStr ""
-      printPairs (p:ps) = do
-        putStrLn (show p)
-        printPairs ps
-
-main :: IO ()
-main = do
-  code <- getContents
-  let Ok prog = pProgram (myLexer code)
-  execProg prog

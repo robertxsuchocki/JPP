@@ -7,4 +7,5 @@ bnfc: Breve.cf
 	bnfc Breve.cf
 
 clean:
-	-rm Abs* Breve Breve.hi Breve.o Doc* Err* Lex* Par* Print* Skel* Test*
+	rm Breve Breve.hi Breve.o TypeBreve.hi TypeBreve.o 
+	rm Abs* Doc* Err* Lex* Par* Print* Skel* Test*

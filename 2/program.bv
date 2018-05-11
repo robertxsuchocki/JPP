@@ -1,6 +1,7 @@
 int main () {
   int x = 1000;
   int y = 10;
+  int z = 1000;
   int res;
   void a(int x) {
     y = y + x;
@@ -14,7 +15,6 @@ int main () {
     } else {
       return x * fac(x-1);
     }
-    print(q);
   }
   for i = 1..10 do {
     if (x != 0) {
