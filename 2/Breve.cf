@@ -2,31 +2,21 @@
 
 entrypoints Program ;
 
-Program.   Program ::= [TopDef] ;
-
-FnDef.	   TopDef ::= Type Ident "(" [Arg] ")" Block ;
-
-separator nonempty TopDef "" ;
-
-Arg.       Arg ::= Type Ident;
-
-separator  Arg "," ;
+Program.   Program ::= [Decl] ;
 
 -- statements ----------------------------------------------
 
 Block.     Block ::= "{" [Decl] [Stmt] "}" ;
 
-separator  Decl "" ;
+VarDecl.   Decl ::= Type Item ";" ;
 
-separator  Stmt "" ;
+FunDecl.   Decl ::= Type Ident "(" [Arg] ")" Block ;
+
+Arg.       Arg ::= Type Ident;
 
 Empty.     Stmt ::= ";" ;
 
 BStmt.     Stmt ::= Block ;
-
-VarDecl.   Decl ::= Type Item ";" ;
-
-FunDecl.   Decl ::= Type Ident "(" [Arg] ")" Block ;
 
 NoInit.    Item ::= Ident ;
 
@@ -42,6 +32,10 @@ Ret.       Stmt ::= "return" Expr ";" ;
 
 VRet.      Stmt ::= "return" ";" ;
 
+Break.     Stmt ::= "break" ";" ;
+
+Continue.  Stmt ::= "continue" ";" ;
+
 Print.     Stmt ::= "print(" Expr ")" ;
 
 PrintLn.   Stmt ::= "println(" Expr ")" ;
@@ -55,6 +49,12 @@ While.     Stmt ::= "while" "(" Expr ")" Stmt ;
 For.       Stmt ::= "for" Ident "=" Expr ".." Expr "do" Stmt ;
 
 SExp.      Stmt ::= Expr  ";" ;
+
+separator  Decl "" ;
+
+separator  Arg "," ;
+
+separator  Stmt "" ;
 
 -- Types ---------------------------------------------------
 

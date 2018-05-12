@@ -22,7 +22,17 @@ int main () {
     }
     x = x + y;
   }
+  y = 0;
+  while (true) {
+    print(y++);
+    if (y > 10) break;
+    if (y > 5) {
+      continue;
+    }
+    println("lol");
+  }
   println(x);
   println(fac(10));
   println(toInt("40") + toInt("2"));
+  return 0;
 }

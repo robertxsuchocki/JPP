@@ -21,7 +21,8 @@ data Value = VNothing | VVoid | VInt Integer | VBool Bool
            | VString String | VFunc Env [Arg] Block
   deriving (Eq, Ord, Show, Read)
 
-data Flow = Normal | Returned Value | Broke | Continued
+data Flow = Normal | Returned Value | Broken | Continued
+  deriving (Eq, Ord, Show, Read)
 
 type Op a b = a -> a -> b
 
@@ -40,26 +41,19 @@ alloc = do
     then return 0
     else let (loc, value) = M.findMax store in return (loc + 1)
 
-forStep :: Loc -> Integer -> Integer -> Stmt -> RESIO ()
+forStep :: Loc -> Integer -> Integer -> Stmt -> RESIO Flow
 forStep loc value1 value2 stmt = do
   modify (M.insert loc (VInt value1))
-  transStmt stmt
-  returned <- checkReturnStatus
-  if (value1 == value2) || returned
-    then return ()
-    else do
-      let diff = signum (value2 - value1)
-      forStep loc (value1 + diff) value2 stmt
-
-checkReturnStatus :: RESIO Bool
-checkReturnStatus = do
-  env   <- ask
-  store <- get
-  let loc   = fromMaybe 0 (M.lookup "return" env)
-  let value = fromMaybe VNothing (M.lookup loc store)
-  case value of
-    VNothing -> return False
-    _        -> return True
+  flow <- transStmt stmt
+  case flow of
+    Returned value -> return (Returned value)
+    Broken         -> return Normal
+    _              -> do
+      if (value1 == value2)
+        then return Normal
+        else do
+          let diff = signum (value2 - value1)
+          forStep loc (value1 + diff) value2 stmt
 
 
 transIdent :: Ident -> RESIO Value
@@ -73,15 +67,8 @@ transIdent (Ident ident) = do
 
 
 transProgram :: Program -> RESIO ()
-transProgram (Program (topdef:_)) = do
-  loc <- alloc
-  modify (M.insert loc VNothing)
-  local (M.insert "return" loc) (transTopDef topdef)
-
-
-transTopDef :: TopDef -> RESIO ()
-transTopDef (FnDef _ _ _ block) = do
-  transBlock block
+transProgram (Program decls) =
+  void $ transBlock (Block decls [(SExp (EApp (Ident "main") []))])
 
 
 transArg :: [(Arg, Value)] -> RESIO Env
@@ -96,25 +83,24 @@ transArg (((Arg _ (Ident ident)), value):args) = do
   local (M.insert ident loc) (transArg args)
 
 
-transBlock :: Block -> RESIO ()
+transBlock :: Block -> RESIO Flow
 
 transBlock (Block (d:ds) ss) = do
   env_f <- transDecl d
   local (env_f) (transBlock (Block ds ss))
 
 transBlock (Block [] (s:ss)) = do
-  transStmt s
-  returned <- checkReturnStatus
-  if (not returned)
-    then transBlock (Block [] ss)
-    else return ()
+  flow <- transStmt s
+  case flow of
+    Normal -> transBlock (Block [] ss)
+    _      -> return flow
 
-transBlock (Block _ []) = return ()
+transBlock (Block _ []) = return Normal
 
 
-transStmt :: Stmt -> RESIO ()
+transStmt :: Stmt -> RESIO Flow
 
-transStmt Empty = return ()
+transStmt Empty = return Normal
 
 transStmt (BStmt block) = do transBlock block
 
@@ -123,13 +109,17 @@ transStmt (Ass (Ident ident) expr) = do
   value <- transExpr expr
   let loc = fromMaybe 0 (M.lookup ident env)
   modify (M.insert loc value)
+  return Normal
 
-transStmt (Ret expr) = do transStmt (Ass (Ident "return") expr)
+transStmt (Ret expr) = do
+  value <- transExpr expr
+  return (Returned value)
 
-transStmt (VRet) = do
-  env   <- ask
-  let loc = fromMaybe 0 (M.lookup "return" env)
-  modify (M.insert loc VVoid)
+transStmt (VRet) = return (Returned VVoid)
+
+transStmt (Break) = return Broken
+
+transStmt (Continue) = return Continued
 
 transStmt (Print expr) = do
   value <- transExpr expr
@@ -137,13 +127,14 @@ transStmt (Print expr) = do
                           (VBool bool)     -> show bool
                           (VString string) -> string
   liftIO $ hPutStr stdout $ out
+  return Normal
 
 transStmt (PrintLn expr) = do
   transStmt (Print expr)
   transStmt (Print (EString "\n"))
 
 
-transStmt (Cond expr stmt) = do transStmt (CondElse expr stmt Empty)
+transStmt (Cond expr stmt) = transStmt (CondElse expr stmt Empty)
 
 transStmt (CondElse expr stmt1 stmt2) = do
   (VBool value) <- transExpr expr
@@ -155,12 +146,12 @@ transStmt (While expr stmt) = do
   (VBool value) <- transExpr expr
   if value
     then do
-      transStmt stmt
-      returned <- checkReturnStatus
-      if (not returned)
-        then transStmt (While expr stmt)
-        else do return ()
-    else do return ()
+      flow <- transStmt stmt
+      case flow of
+        Returned value -> return (Returned value)
+        Broken         -> return Normal
+        _              -> transStmt (While expr stmt)
+    else do return Normal
 
 transStmt (For (Ident ident) expr1 expr2 stmt) = do
   (VInt value1) <- transExpr expr1
@@ -168,12 +159,15 @@ transStmt (For (Ident ident) expr1 expr2 stmt) = do
   loc <- alloc
   local (M.insert ident loc) (forStep loc value1 value2 stmt)
   modify (M.delete loc)
+  return Normal
 
-transStmt (SExp expr) = do void (transExpr expr)
+transStmt (SExp expr) = do
+  void (transExpr expr)
+  return Normal
 
 transStmt x = case x of
-  ArrayAss ident expr1 expr2 -> return ()
-  DictAss ident expr1 expr2 -> return ()
+  ArrayAss ident expr1 expr2 -> return Normal
+  DictAss ident expr1 expr2 -> return Normal
 
 
 transDecl :: Decl -> RESIO (Env -> Env)
@@ -194,17 +188,6 @@ transDecl (FunDecl _ (Ident ident) args block) = do
   loc  <- alloc
   modify (M.insert loc (VFunc (M.insert ident loc env) args block))
   return (M.insert ident loc)
-
-
-transType :: Type -> RESIO ()
-transType x = case x of
-  Int -> return ()
-  Str -> return ()
-  Bool -> return ()
-  Void -> return ()
-  Array type_ -> return ()
-  Dict type_1 type_2 -> return ()
-  Fun type_ types -> return ()
 
 
 transExpr :: Expr -> RESIO Value
@@ -247,15 +230,14 @@ transExpr (EApp ident exprs) = do
   (VFunc env args block) <- transIdent ident
 
   env'   <- local (\_ -> env) (transArg (zip args values))
-  local (\_ -> env') (transBlock block)
+  flow   <- local (\_ -> env') (transBlock block)
 
   store' <- get
   modify (\_ -> M.intersection store' store)
 
-  let loc   = fromMaybe 0 (M.lookup "return" env)
-  let value = fromMaybe VVoid (M.lookup loc store')
-  modify (M.insert loc VNothing)
-  return value
+  case flow of
+    (Returned value) -> return value
+    _                -> return VVoid
 
 transExpr (EString string) = return (VString string)
 
@@ -348,4 +330,4 @@ main = do
       if (not valid)
         then do return ()
         else do runProg tree
-    _ -> hPutStr stderr $ "Error: Parse failed"
+    _ -> hPutStr stderr $ "Error: Parse failed\n"

@@ -5,6 +5,8 @@ import AbsBreve
 import Control.Monad.Trans
 import Control.Monad.Trans.Reader
 
+import Data.List
+
 import Data.Map (Map, (!))
 import qualified Data.Map as M
 
@@ -18,14 +20,9 @@ type RIO a = (ReaderT TypeEnv IO) a
 
 
 validProgram :: Program -> RIO Bool
-validProgram (Program (topdef:_)) = do
-  valid <- validTopDef topdef
-  return valid
-
-
-validTopDef :: TopDef -> RIO Bool
-validTopDef (FnDef _ _ _ block) = do
-  valid <- validBlock block
+validProgram (Program decls) = do
+  let main = (SExp (EApp (Ident "main") []))
+  valid <- validBlock (Block decls [main])
   return valid
 
 
@@ -45,7 +42,7 @@ validBlock (Block (d:ds) ss) = do
   env <- validDecl d
   if (M.null env)
     then do
-      liftIO $ hPutStr stderr $ "Error: Typing failed in declaration " ++ (show d)
+      liftIO $ hPutStr stderr $ "Error: Typing failed in declaration " ++ (show d) ++ "\n"
       return False
     else do
       valid <- local (\_ -> env) (validBlock (Block ds ss))
@@ -58,10 +55,38 @@ validBlock (Block [] (s:ss)) = do
       valid <- validBlock (Block [] ss)
       return valid
     else do
-      liftIO $ hPutStr stderr $ "Error: Typing failed in statement " ++ (show s)
+      liftIO $ hPutStr stderr $ "Error: Typing failed in statement " ++ (show s) ++ "\n"
       return False
 
 validBlock (Block _ []) = return True
+
+
+hasReturnClause :: [Stmt] -> RIO Bool
+
+hasReturnClause [] = return False
+
+hasReturnClause ((BStmt (Block ds bss)):ss) =
+  hasReturnClause (bss ++ ss)
+
+hasReturnClause ((CondElse expr stmt1 stmt2):ss) = do
+  valid1 <- hasReturnClause [stmt1]
+  valid2 <- hasReturnClause [stmt2]
+  if (valid1 && valid2)
+    then return True
+    else hasReturnClause ss
+
+hasReturnClause ((While expr stmt):ss) =
+  hasReturnClause (stmt:ss)
+
+hasReturnClause ((For (Ident ident) expr1 expr2 stmt):ss) =
+  hasReturnClause (stmt:ss)
+
+hasReturnClause (s:ss) = case s of
+  Ret _    -> return True
+  VRet     -> return True
+  Break    -> return False
+  Continue -> return False
+  _        -> hasReturnClause ss
 
 
 validDecl :: Decl -> RIO TypeEnv
@@ -80,12 +105,19 @@ validDecl (VarDecl type_ (Init (Ident ident) expr)) = do
       return M.empty
 
 validDecl (FunDecl type_ (Ident ident) args block) = do
+  let idents = argsIdents args
+  let Block _ stmts = block
+  let fun = (Fun type_ (argsTypes args))
+
   env   <- ask
   env'  <- argsDecl args
-  let fun = (Fun type_ (argsToTypes args))
   let env'' = (M.insert "return" type_ (M.insert ident fun env'))
-  valid <- local (\_ -> env'') (validBlock block)
-  if valid
+
+  valid_b <- local (\_ -> env'') (validBlock block)
+  let valid_a = idents == (nub idents)
+  valid_r <- hasReturnClause stmts
+
+  if (valid_b && valid_a && (valid_r || type_ == Void))
     then do
       return (M.insert ident fun env)
     else do
@@ -93,26 +125,24 @@ validDecl (FunDecl type_ (Ident ident) args block) = do
 
 
 argsDecl :: [Arg] -> RIO TypeEnv
-
 argsDecl [] = do
   env <- ask
   return env
-
 argsDecl ((Arg type_ (Ident ident)):args) = do
   local (M.insert ident type_) (argsDecl args)
 
 
-argsToTypes :: [Arg] -> [Type]
+argsTypes :: [Arg] -> [Type]
+argsTypes [] = []
+argsTypes ((Arg type_ _):args) = type_ : (argsTypes args)
 
-argsToTypes [] = []
-argsToTypes ((Arg type_ _):args) = type_ : (argsToTypes args)
+
+argsIdents :: [Arg] -> [Ident]
+argsIdents [] = []
+argsIdents ((Arg _ ident):args) = ident : (argsIdents args)
 
 
 validArgs :: [Type] -> [Expr] -> RIO Bool
-
-validArgs [] [] = do
-  return True
-
 validArgs (type_:types) (expr:exprs) = do
   valid <- validExpr type_ expr
   if (not valid)
@@ -121,15 +151,13 @@ validArgs (type_:types) (expr:exprs) = do
     else do
       valid' <- validArgs types exprs
       return valid'
-
-validArgs _ _ = do
-  return False
+validArgs [] [] = return True
+validArgs _ _ = return False
 
 
 validStmt :: Stmt -> RIO Bool
 
-validStmt Empty = do
-  return True
+validStmt Empty = return True
 
 validStmt (BStmt block) = do
   valid <- validBlock block
@@ -151,6 +179,10 @@ validStmt (Ret expr) = do
 validStmt (VRet) = do
   valid <- validIdent (Ident "return") Void
   return valid
+
+validStmt (Break) = return True
+
+validStmt (Continue) = return True
 
 validStmt (Print expr) = do
   valid_i <- validExpr Int expr
