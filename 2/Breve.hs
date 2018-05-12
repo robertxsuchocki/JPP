@@ -6,6 +6,7 @@ import ParBreve
 import TypeBreve
 import ErrM
 
+import Control.Monad.Except
 import Control.Monad.State
 import Control.Monad.Trans.Reader
 
@@ -13,6 +14,8 @@ import Data.Map (Map, (!))
 import qualified Data.Map as M
 
 import Data.Maybe
+
+import System.IO
 
 data Value = VNothing | VVoid | VInt Integer | VBool Bool
            | VString String | VFunc Env [Arg] Block
@@ -26,16 +29,16 @@ type Loc = Integer
 
 type Store = M.Map Loc Value
 
-type RR a = ReaderT Env (StateT Store IO) a
+type RESIO a = ReaderT Env (ExceptT String (StateT Store IO)) a
 
-alloc :: RR Loc
+alloc :: RESIO Loc
 alloc = do
   st <- get
   if (M.null st)
     then return 0
     else let (loc, value) = M.findMax st in return (loc + 1)
 
-forStep :: Loc -> Integer -> Integer -> Stmt -> RR ()
+forStep :: Loc -> Integer -> Integer -> Stmt -> RESIO ()
 forStep loc value1 value2 stmt = do
   modify (M.insert loc (VInt value1))
   transStmt stmt
@@ -46,37 +49,40 @@ forStep loc value1 value2 stmt = do
       let diff = signum (value2 - value1)
       forStep loc (value1 + diff) value2 stmt
 
-checkReturnStatus :: RR Bool
+checkReturnStatus :: RESIO Bool
 checkReturnStatus = do
   env   <- ask
   store <- get
   let loc   = fromMaybe 0 (M.lookup "return" env)
   let value = fromMaybe VNothing (M.lookup loc store)
-  case value of VNothing -> return False
-                _        -> return True
+  case value of
+    VNothing -> return False
+    _        -> return True
 
 
-transIdent :: Ident -> RR Value
+transIdent :: Ident -> RESIO Value
 transIdent (Ident ident) = do
   env   <- ask
   store <- get
-  let loc = fromMaybe (error ("Undefined:" ++ (show ident))) (M.lookup ident env)
-  return $ fromMaybe (error ("Uninitialized:" ++ (show ident))) (M.lookup loc store)
+  let loc = fromMaybe 0 (M.lookup ident env)
+  case (M.lookup loc store) of
+    (Just value) -> return value
+    _            -> throwError $ "uninitialized variable " ++ (show ident)
 
 
-transProgram :: Program -> RR ()
+transProgram :: Program -> RESIO ()
 transProgram (Program (topdef:_)) = do
   loc <- alloc
   modify (M.insert loc VNothing)
   local (M.insert "return" loc) (transTopDef topdef)
 
 
-transTopDef :: TopDef -> RR ()
+transTopDef :: TopDef -> RESIO ()
 transTopDef (FnDef _ _ _ block) = do
   transBlock block
 
 
-transArg :: [(Arg, Value)] -> RR Env
+transArg :: [(Arg, Value)] -> RESIO Env
 
 transArg [] = do
   env <- ask
@@ -88,7 +94,7 @@ transArg (((Arg _ (Ident ident)), value):args) = do
   local (M.insert ident loc) (transArg args)
 
 
-transBlock :: Block -> RR ()
+transBlock :: Block -> RESIO ()
 
 transBlock (Block (d:ds) ss) = do
   env_f <- transDecl d
@@ -104,7 +110,7 @@ transBlock (Block [] (s:ss)) = do
 transBlock (Block _ []) = return ()
 
 
-transStmt :: Stmt -> RR ()
+transStmt :: Stmt -> RESIO ()
 
 transStmt Empty = return ()
 
@@ -113,7 +119,7 @@ transStmt (BStmt block) = do transBlock block
 transStmt (Ass (Ident ident) expr) = do
   env   <- ask
   value <- transExpr expr
-  let loc = fromMaybe (error ("Undefined:" ++ (show ident))) (M.lookup ident env)
+  let loc = fromMaybe 0 (M.lookup ident env)
   modify (M.insert loc value)
 
 transStmt (Ret expr) = do transStmt (Ass (Ident "return") expr)
@@ -128,8 +134,12 @@ transStmt (Print expr) = do
   let out = case value of (VInt int)       -> show int
                           (VBool bool)     -> show bool
                           (VString string) -> string
-                          _                -> "void"
-  liftIO $ print out
+  liftIO $ hPutStr stdout $ out
+
+transStmt (PrintLn expr) = do
+  transStmt (Print expr)
+  transStmt (Print (EString "\n"))
+
 
 transStmt (Cond expr stmt) = do transStmt (CondElse expr stmt Empty)
 
@@ -164,7 +174,7 @@ transStmt x = case x of
   DictAss ident expr1 expr2 -> return ()
 
 
-transDecl :: Decl -> RR (Env -> Env)
+transDecl :: Decl -> RESIO (Env -> Env)
 
 transDecl (VarDecl _ (NoInit (Ident ident))) = do
   loc <- alloc
@@ -184,7 +194,7 @@ transDecl (FunDecl _ (Ident ident) args block) = do
   return (M.insert ident loc)
 
 
-transType :: Type -> RR ()
+transType :: Type -> RESIO ()
 transType x = case x of
   Int -> return ()
   Str -> return ()
@@ -195,7 +205,7 @@ transType x = case x of
   Fun type_ types -> return ()
 
 
-transExpr :: Expr -> RR Value
+transExpr :: Expr -> RESIO Value
 
 transExpr (Incr (Ident ident)) = do
   env <- ask
@@ -259,7 +269,12 @@ transExpr (EMul expr1 mulop expr2) = do
   (VInt value1) <- transExpr expr1
   (VInt value2) <- transExpr expr2
   op <- transMulOp mulop
-  return (VInt (op value1 value2))
+  case op of
+    div -> do
+      if (value2 == 0)
+        then do throwError "division by zero"
+        else do return (VInt (op value1 value2))
+  do return (VInt (op value1 value2))
 
 transExpr (EAdd expr1 addop expr2) = do
   (VInt value1) <- transExpr expr1
@@ -290,20 +305,20 @@ transExpr x = case x of
   EValDict ident expr -> return VNothing
 
 
-transAddOp :: AddOp -> RR (Op Integer Integer)
+transAddOp :: AddOp -> RESIO (Op Integer Integer)
 transAddOp x = case x of
   Plus  -> return (+)
   Minus -> return (-)
 
 
-transMulOp :: MulOp -> RR (Op Integer Integer)
+transMulOp :: MulOp -> RESIO (Op Integer Integer)
 transMulOp x = case x of
   Times -> return (*)
   Div   -> return div
   Mod   -> return mod
 
 
-transRelOp :: RelOp -> RR (Op Integer Bool)
+transRelOp :: RelOp -> RESIO (Op Integer Bool)
 transRelOp x = case x of
   LTH -> return (<)
   LE  -> return (<=)
@@ -313,9 +328,12 @@ transRelOp x = case x of
   NE  -> return (/=)
 
 
-execProg :: Program -> IO ()
-execProg prog =
-  do void (execStateT (runReaderT (transProgram prog) M.empty) M.empty)
+runProg :: Program -> IO ()
+runProg prog = do
+  (ex, _) <- runStateT (runExceptT (runReaderT (transProgram prog) M.empty)) M.empty
+  case ex of
+    (Left message) -> do hPutStr stderr $ "Error: " ++ message ++ "\n"
+    _              -> do return ()
 
 
 main :: IO ()
@@ -327,5 +345,5 @@ main = do
       valid <- runReaderT (validProgram tree) M.empty
       if (not valid)
         then do return ()
-        else do execProg tree
-    _ -> print "Parse failed"
+        else do runProg tree
+    _ -> hPutStr stderr $ "Error: Parse failed"

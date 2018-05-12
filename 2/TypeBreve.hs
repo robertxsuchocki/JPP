@@ -10,6 +10,8 @@ import qualified Data.Map as M
 
 import Data.Maybe
 
+import System.IO
+
 type TypeEnv = M.Map String Type
 
 type RIO a = (ReaderT TypeEnv IO) a
@@ -43,7 +45,7 @@ validBlock (Block (d:ds) ss) = do
   env <- validDecl d
   if (M.null env)
     then do
-      liftIO $ print $ "Typing failed in declaration: " ++ (show d)
+      liftIO $ hPutStr stderr $ "Error: Typing failed in declaration " ++ (show d)
       return False
     else do
       valid <- local (\_ -> env) (validBlock (Block ds ss))
@@ -56,7 +58,7 @@ validBlock (Block [] (s:ss)) = do
       valid <- validBlock (Block [] ss)
       return valid
     else do
-      liftIO $ print $ "Typing failed in statement: " ++ (show s)
+      liftIO $ hPutStr stderr $ "Error: Typing failed in statement " ++ (show s)
       return False
 
 validBlock (Block _ []) = return True
@@ -154,8 +156,9 @@ validStmt (Print expr) = do
   valid_i <- validExpr Int expr
   valid_b <- validExpr Bool expr
   valid_s <- validExpr Str expr
-  valid_v <- validExpr Void expr
-  return (valid_i || valid_b || valid_s || valid_v)
+  return (valid_i || valid_b || valid_s)
+
+validStmt (PrintLn expr) = validStmt (Print expr)
 
 validStmt (Cond expr stmt) = do
   valid_e <- validExpr Bool expr

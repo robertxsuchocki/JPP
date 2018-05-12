@@ -44,6 +44,8 @@ VRet.      Stmt ::= "return" ";" ;
 
 Print.     Stmt ::= "print(" Expr ")" ;
 
+PrintLn.   Stmt ::= "println(" Expr ")" ;
+
 Cond.      Stmt ::= "if" "(" Expr ")" Stmt  ;
 
 CondElse.  Stmt ::= "if" "(" Expr ")" Stmt "else" Stmt  ;
@@ -94,7 +96,7 @@ EApp.      Expr6 ::= Ident "(" [Expr] ")" ;
 
 EString.   Expr6 ::= String ;
 
-ENewArray. Expr6 ::= "[" Expr "]" ;
+ENewArray. Expr6 ::= "[]" ;
 
 EValArray. Expr6 ::= Ident "[" Expr "]" ;
 

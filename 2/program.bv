@@ -1,8 +1,6 @@
 int main () {
   int x = 1000;
   int y = 10;
-  int z = 1000;
-  int res;
   void a(int x) {
     y = y + x;
   }
@@ -24,8 +22,7 @@ int main () {
     }
     x = x + y;
   }
-  print(x);
-  res = fac(10);
-  print(res);
-  print(toInt("40") + toInt("2"));
+  println(x);
+  println(fac(10));
+  println(toInt("40") + toInt("2"));
 }
