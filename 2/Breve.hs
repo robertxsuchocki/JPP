@@ -21,6 +21,8 @@ data Value = VNothing | VVoid | VInt Integer | VBool Bool
            | VString String | VFunc Env [Arg] Block
   deriving (Eq, Ord, Show, Read)
 
+data Flow = Normal | Returned Value | Broke | Continued
+
 type Op a b = a -> a -> b
 
 type Env = M.Map String Loc
@@ -33,10 +35,10 @@ type RESIO a = ReaderT Env (ExceptT String (StateT Store IO)) a
 
 alloc :: RESIO Loc
 alloc = do
-  st <- get
-  if (M.null st)
+  store <- get
+  if (M.null store)
     then return 0
-    else let (loc, value) = M.findMax st in return (loc + 1)
+    else let (loc, value) = M.findMax store in return (loc + 1)
 
 forStep :: Loc -> Integer -> Integer -> Stmt -> RESIO ()
 forStep loc value1 value2 stmt = do
@@ -299,7 +301,7 @@ transExpr (EOr expr1 expr2) = do
   return (VBool ((||) value1 value2))
 
 transExpr x = case x of
-  ENewArray expr -> return VNothing
+  ENewArray -> return VNothing
   EValArray ident expr -> return VNothing
   ENewDict -> return VNothing
   EValDict ident expr -> return VNothing
