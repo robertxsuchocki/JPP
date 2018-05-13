@@ -1,0 +1,18 @@
+int main () {
+  int x = 0;
+  int y;
+  for i = 1..9 do {
+    x = x + i;
+  }
+  y = x - 3;
+  for i = 10..1 do {
+    if (y % i == 0) {
+      y = y / i;
+    }
+    if (x - 3 == 42 && y == 6) {
+      println("success!");
+      # prints success! once when i == 7
+    }
+  }
+  return 0;
+}

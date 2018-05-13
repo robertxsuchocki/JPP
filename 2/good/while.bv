@@ -1,0 +1,22 @@
+int main () {
+  int x = 0;
+  int y = 0;
+  int z = 0;
+  while (true) {
+    z++;
+    if (z > 28) {
+      break;
+    }
+    x++;
+    if (z > 14) {
+      continue;
+    }
+    y++;
+  }
+  # x == 28 && y == 14
+  if (x == y * 2 && x + y == 42) {
+    println("success!");
+    # prints success!
+  }
+  return 0;
+}

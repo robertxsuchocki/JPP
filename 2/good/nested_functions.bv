@@ -1,0 +1,23 @@
+int main () {
+  int x = 6;
+  int y = 6;
+  int squared (int x) {
+    int power (int x,int y) {
+      if (y <= 0) {
+        return 1;
+      } else if (y == 1) {
+        return x;
+      } else {
+        return x * power(x,y-1);
+      }
+    }
+    return power(x,2);
+  }
+  x = squared(x);
+  # x == 36
+  if (x + y == 42) {
+    println("success!")
+    # prints success!
+  }
+  return 0;
+}

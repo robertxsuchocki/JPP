@@ -17,8 +17,8 @@ import Data.Maybe
 
 import System.IO
 
-data Value = VNothing | VVoid | VInt Integer | VBool Bool
-           | VString String | VFunc Env [Arg] Block
+data Value = VVoid | VInt Integer | VBool Bool | VStr String | VList [Value]
+           | VDict (M.Map Value Value) | VFunc Env [Arg] Block
   deriving (Eq, Ord, Show, Read)
 
 data Flow = Normal | Returned Value | Broken | Continued
@@ -39,14 +39,14 @@ alloc = do
   store <- get
   if (M.null store)
     then return 0
-    else let (loc, value) = M.findMax store in return (loc + 1)
+    else let (loc, value) = M.findMax store in return $ loc + 1
 
 forStep :: Loc -> Integer -> Integer -> Stmt -> RESIO Flow
 forStep loc value1 value2 stmt = do
   modify (M.insert loc (VInt value1))
   flow <- transStmt stmt
   case flow of
-    Returned value -> return (Returned value)
+    Returned value -> return $ Returned value
     Broken         -> return Normal
     _              -> do
       if (value1 == value2)
@@ -111,28 +111,38 @@ transStmt (Ass (Ident ident) expr) = do
   modify (M.insert loc value)
   return Normal
 
+transStmt (ListAss (Ident ident) expr1 expr2) = do
+  (VList list) <- transIdent (Ident ident)
+  (VInt index) <- transExpr expr1
+  if index > (toInteger $ length list)
+    then throwError $ "index " ++ (show index) ++ " out of range"
+    else do
+      env   <- ask
+      value <- transExpr expr2
+      let loc   = fromMaybe 0 (M.lookup ident env)
+      let list' = (take (fromIntegral index) list) ++ [value]
+                    ++ (drop (fromIntegral (index + 1)) list)
+      modify (M.insert loc (VList list'))
+      return Normal
+
+transStmt (DictAss (Ident ident) expr1 expr2) = do
+  (VDict dict) <- transIdent (Ident ident)
+  env   <- ask
+  key   <- transExpr expr1
+  value <- transExpr expr2
+  let loc   = fromMaybe 0 (M.lookup ident env)
+  modify (M.insert loc (VDict (M.insert key value dict)))
+  return Normal
+
 transStmt (Ret expr) = do
   value <- transExpr expr
-  return (Returned value)
+  return $ Returned value
 
-transStmt (VRet) = return (Returned VVoid)
+transStmt (VRet) = return $ Returned VVoid
 
 transStmt (Break) = return Broken
 
 transStmt (Continue) = return Continued
-
-transStmt (Print expr) = do
-  value <- transExpr expr
-  let out = case value of (VInt int)       -> show int
-                          (VBool bool)     -> show bool
-                          (VString string) -> string
-  liftIO $ hPutStr stdout $ out
-  return Normal
-
-transStmt (PrintLn expr) = do
-  transStmt (Print expr)
-  transStmt (Print (EString "\n"))
-
 
 transStmt (Cond expr stmt) = transStmt (CondElse expr stmt Empty)
 
@@ -148,7 +158,7 @@ transStmt (While expr stmt) = do
     then do
       flow <- transStmt stmt
       case flow of
-        Returned value -> return (Returned value)
+        Returned value -> return $ Returned value
         Broken         -> return Normal
         _              -> transStmt (While expr stmt)
     else do return Normal
@@ -165,9 +175,25 @@ transStmt (SExp expr) = do
   void (transExpr expr)
   return Normal
 
-transStmt x = case x of
-  ArrayAss ident expr1 expr2 -> return Normal
-  DictAss ident expr1 expr2 -> return Normal
+transStmt (Print expr) = do
+  value <- transExpr expr
+  let out = case value of (VInt int)       -> show int
+                          (VBool bool)     -> show bool
+                          (VStr string)    -> string
+  liftIO $ hPutStr stdout $ out
+  return Normal
+
+transStmt (PrintLn expr) = do
+  transStmt (Print expr)
+  transStmt (Print (EStr "\n"))
+
+transStmt (DictDel (Ident ident) expr) = do
+  (VDict dict) <- transIdent (Ident ident)
+  env <- ask
+  key <- transExpr expr
+  let loc = fromMaybe 0 (M.lookup ident env)
+  modify (M.insert loc (VDict (M.delete key dict)))
+  return Normal
 
 
 transDecl :: Decl -> RESIO (Env -> Env)
@@ -175,19 +201,19 @@ transDecl :: Decl -> RESIO (Env -> Env)
 transDecl (VarDecl _ (NoInit (Ident ident))) = do
   loc <- alloc
   modify (M.insert loc VVoid)
-  return (M.insert ident loc)
+  return $ M.insert ident loc
 
 transDecl (VarDecl _ (Init (Ident ident) expr)) = do
   loc   <- alloc
   value <- transExpr expr
   modify (M.insert loc value)
-  return (M.insert ident loc)
+  return $ M.insert ident loc
 
 transDecl (FunDecl _ (Ident ident) args block) = do
   env  <- ask
   loc  <- alloc
   modify (M.insert loc (VFunc (M.insert ident loc env) args block))
-  return (M.insert ident loc)
+  return $ M.insert ident loc
 
 
 transExpr :: Expr -> RESIO Value
@@ -197,32 +223,41 @@ transExpr (Incr (Ident ident)) = do
   let loc = fromMaybe 0 (M.lookup ident env)
   (VInt value) <- transIdent (Ident ident)
   modify (M.insert loc (VInt (value + 1)))
-  return (VInt value)
+  return $ VInt value
 
 transExpr (Decr (Ident ident)) = do
   env <- ask
   let loc = fromMaybe 0 (M.lookup ident env)
   (VInt value) <- transIdent (Ident ident)
   modify (M.insert loc (VInt (value - 1)))
-  return (VInt value)
+  return $ VInt value
 
 transExpr (EIntStr expr) = do
   (VInt value) <- transExpr expr
-  return (VString (show value))
+  return $ VStr (show value)
 
 transExpr (EStrInt expr) = do
-  (VString value) <- transExpr expr
-  return (VInt (read value::Integer))
+  (VStr value) <- transExpr expr
+  return $ VInt (read value::Integer)
+
+transExpr (ListLen ident) = do
+  (VList list) <- transIdent ident
+  return $ VInt (toInteger (length list))
+
+transExpr (DictHas ident expr) = do
+  (VDict dict) <- transIdent ident
+  key <- transExpr expr
+  return $ VBool (M.member key dict)
 
 transExpr (EVar ident) = do
   value <- transIdent ident
   return value
 
-transExpr (ELitInt integer) = return (VInt integer)
+transExpr (ELitInt integer) = return $ VInt integer
 
-transExpr (ELitTrue) = return (VBool True)
+transExpr (ELitTrue) = return $ VBool True
 
-transExpr (ELitFalse) = return (VBool False)
+transExpr (ELitFalse) = return $ VBool False
 
 transExpr (EApp ident exprs) = do
   store  <- get
@@ -239,15 +274,37 @@ transExpr (EApp ident exprs) = do
     (Returned value) -> return value
     _                -> return VVoid
 
-transExpr (EString string) = return (VString string)
+transExpr (EStr string) = return $ VStr string
+
+transExpr (ENewList) = return $ VList []
+
+transExpr (EValList ident expr) = do
+  (VList list) <- transIdent ident
+  (VInt index) <- transExpr expr
+  if index >= (toInteger $ length list)
+    then throwError $ "index " ++ (show index) ++ " out of range"
+    else return $ list !! (fromIntegral index)
+
+transExpr (ENewDict) = return $ VDict M.empty
+
+transExpr (EValDict ident expr) = do
+  (VDict dict) <- transIdent ident
+  key <- transExpr expr
+  case (M.lookup key dict) of
+    (Just value) -> return value
+    _            -> do
+      let msg_key = case key of (VInt int)   -> show int
+                                (VBool bool) -> show bool
+                                (VStr str)   -> str
+      throwError $ "key " ++ msg_key ++ " not in dict"
 
 transExpr (Neg expr) = do
   (VInt value) <- transExpr expr
-  return (VInt (-value))
+  return $ VInt (-value)
 
 transExpr (Not expr) = do
   (VBool value) <- transExpr expr
-  return (VBool (not value))
+  return $ VBool (not value)
 
 transExpr (EMul expr1 mulop expr2) = do
   (VInt value1) <- transExpr expr1
@@ -256,37 +313,31 @@ transExpr (EMul expr1 mulop expr2) = do
   case op of
     div -> do
       if (value2 == 0)
-        then do throwError "division by zero"
-        else do return (VInt (op value1 value2))
-  do return (VInt (op value1 value2))
+        then throwError "division by zero"
+        else return $ VInt (op value1 value2)
+  return $ VInt (op value1 value2)
 
 transExpr (EAdd expr1 addop expr2) = do
   (VInt value1) <- transExpr expr1
   (VInt value2) <- transExpr expr2
   op <- transAddOp addop
-  return (VInt (op value1 value2))
+  return $ VInt (op value1 value2)
 
 transExpr (ERel expr1 relop expr2) = do
   (VInt value1) <- transExpr expr1
   (VInt value2) <- transExpr expr2
   op <- transRelOp relop
-  return (VBool (op value1 value2))
+  return $ VBool (op value1 value2)
 
 transExpr (EAnd expr1 expr2) = do
   (VBool value1) <- transExpr expr1
   (VBool value2) <- transExpr expr2
-  return (VBool ((&&) value1 value2))
+  return $ VBool ((&&) value1 value2)
 
 transExpr (EOr expr1 expr2) = do
   (VBool value1) <- transExpr expr1
   (VBool value2) <- transExpr expr2
-  return (VBool ((||) value1 value2))
-
-transExpr x = case x of
-  ENewArray -> return VNothing
-  EValArray ident expr -> return VNothing
-  ENewDict -> return VNothing
-  EValDict ident expr -> return VNothing
+  return $ VBool ((||) value1 value2)
 
 
 transAddOp :: AddOp -> RESIO (Op Integer Integer)
@@ -314,10 +365,10 @@ transRelOp x = case x of
 
 runProg :: Program -> IO ()
 runProg prog = do
-  (ex, _) <- runStateT (runExceptT (runReaderT (transProgram prog) M.empty)) M.empty
-  case ex of
-    (Left message) -> do hPutStr stderr $ "Error: " ++ message ++ "\n"
-    _              -> do return ()
+  res <- runStateT (runExceptT (runReaderT (transProgram prog) M.empty)) M.empty
+  case res of
+    ((Left message), _) -> do hPutStr stderr $ "Error: " ++ message ++ "\n"
+    _                   -> do return ()
 
 
 main :: IO ()

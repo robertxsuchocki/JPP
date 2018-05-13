@@ -172,25 +172,33 @@ validStmt (Ass (Ident ident) expr) = do
     _ -> do
       return False
 
-validStmt (Ret expr) = do
-  valid <- validStmt (Ass (Ident "return") expr)
-  return valid
+validStmt (ListAss (Ident ident) expr1 expr2) = do
+  env <- ask
+  case M.lookup ident env of
+    Just (List type_) -> do
+      valid1 <- validExpr Int expr1
+      valid2 <- validExpr type_ expr2
+      return $ valid1 && valid2
+    _ -> do
+      return False
 
-validStmt (VRet) = do
-  valid <- validIdent (Ident "return") Void
-  return valid
+validStmt (DictAss (Ident ident) expr1 expr2) = do
+  env <- ask
+  case M.lookup ident env of
+    Just (Dict type_1 type_2) -> do
+      valid1 <- validExpr type_1 expr1
+      valid2 <- validExpr type_2 expr2
+      return $ valid1 && valid2
+    _ -> do
+      return False
+
+validStmt (Ret expr) = validStmt (Ass (Ident "return") expr)
+
+validStmt (VRet) = validIdent (Ident "return") Void
 
 validStmt (Break) = return True
 
 validStmt (Continue) = return True
-
-validStmt (Print expr) = do
-  valid_i <- validExpr Int expr
-  valid_b <- validExpr Bool expr
-  valid_s <- validExpr Str expr
-  return (valid_i || valid_b || valid_s)
-
-validStmt (PrintLn expr) = validStmt (Print expr)
 
 validStmt (Cond expr stmt) = do
   valid_e <- validExpr Bool expr
@@ -211,7 +219,7 @@ validStmt (While expr stmt) = do
 validStmt (For (Ident ident) expr1 expr2 stmt) = do
   valid_e1 <- validExpr Int expr1
   valid_e2 <- validExpr Int expr2
-  valid_s  <- validStmt stmt
+  valid_s  <- local (M.insert ident Int) (validStmt stmt)
   return (valid_e1 && valid_e2 && valid_s)
 
 validStmt (SExp expr) = do
@@ -220,6 +228,20 @@ validStmt (SExp expr) = do
   valid_s <- validExpr Str expr
   valid_v <- validExpr Void expr
   return (valid_i || valid_b || valid_s || valid_v)
+
+validStmt (Print expr) = do
+  valid_i <- validExpr Int expr
+  valid_b <- validExpr Bool expr
+  valid_s <- validExpr Str expr
+  return (valid_i || valid_b || valid_s)
+
+validStmt (PrintLn expr) = validStmt (Print expr)
+
+validStmt (DictDel (Ident ident) expr) = do
+  env <- ask
+  case M.lookup ident env of
+    Just (Dict type_1 _) -> validExpr type_1 expr
+    _                    -> return False
 
 
 validExpr :: Type -> Expr -> RIO Bool
@@ -237,25 +259,45 @@ validExpr type_ (EApp (Ident ident) exprs) = do
     _ -> do
       return False
 
+validExpr type_ (EValList (Ident ident) expr) = do
+  env <- ask
+  case M.lookup ident env of
+    Just (List t) -> do
+      valid <- validExpr Int expr
+      return (t == type_ && valid)
+    _ -> do
+      return False
 
-validExpr Int (ELitInt integer) = do
-  return True
+validExpr type_ (EValDict (Ident ident) expr) = do
+  env <- ask
+  case M.lookup ident env of
+    Just (Dict t1 t2) -> do
+      valid <- validExpr t1 expr
+      return (t2 == type_ && valid)
+    _ -> do
+      return False
 
-validExpr Int (Incr ident) = do
-  valid <- validIdent ident Int
-  return valid
+validExpr Int (Incr ident) = validIdent ident Int
+validExpr Int (Decr ident) = validIdent ident Int
+validExpr Int (EStrInt expr) = validExpr Str expr
+validExpr Int (ELitInt integer) = return True
+validExpr Int (Neg expr) = validExpr Int expr
 
-validExpr Int (Decr ident) = do
-  valid <- validIdent ident Int
-  return valid
+validExpr Bool (ELitTrue) = return True
+validExpr Bool (ELitFalse) = return True
+validExpr Bool (Not expr) = validExpr Bool expr
 
-validExpr Int (EStrInt expr) = do
-  valid <- validExpr Str expr
-  return valid
+validExpr Str (EIntStr expr) = validExpr Int expr
+validExpr Str (EStr string) = return True
 
-validExpr Int (Neg expr) = do
-  valid <- validExpr Int expr
-  return valid
+validExpr (List _) (ENewList) = return True
+validExpr (Dict _ _) (ENewDict) = return True
+
+validExpr Int (ListLen (Ident ident)) = do
+  env <- ask
+  case M.lookup ident env of
+    Just (List _) -> return True
+    _             -> return False
 
 validExpr Int (EMul expr1 mulop expr2) = do
   valid1 <- validExpr Int expr1
@@ -267,16 +309,11 @@ validExpr Int (EAdd expr1 addop expr2) = do
   valid2 <- validExpr Int expr2
   return (valid1 && valid2)
 
-
-validExpr Bool (ELitTrue) = do
-  return True
-
-validExpr Bool (ELitFalse) = do
-  return True
-
-validExpr Bool (Not expr) = do
-  valid <- validExpr Bool expr
-  return valid
+validExpr Bool (DictHas (Ident ident) expr) = do
+  env <- ask
+  case M.lookup ident env of
+    Just (Dict type_ _) -> validExpr type_ expr
+    _                   -> return False
 
 validExpr Bool (ERel expr1 relop expr2) = do
   valid1 <- validExpr Int expr1
@@ -293,14 +330,4 @@ validExpr Bool (EOr expr1 expr2) = do
   valid2 <- validExpr Bool expr2
   return (valid1 && valid2)
 
-
-validExpr Str (EString string) = do
-  return True
-
-validExpr Str (EIntStr expr) = do
-  valid <- validExpr Int expr
-  return valid
-
-
-validExpr type_ expr = do
-  return False
+validExpr type_ expr = return False
