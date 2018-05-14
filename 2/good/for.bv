@@ -1,6 +1,7 @@
 int main () {
   int x = 0;
   int y;
+
   for i = 1..9 do {
     x = x + i;
   }

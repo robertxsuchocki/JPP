@@ -1,0 +1,14 @@
+int main () {
+  int x = 0;
+  bool y = true;
+  str z = "";
+
+  if (x) {
+    while (z) {
+      for 1 in y..false do {
+        return;
+      }
+    }
+  }
+  return 0;
+}

@@ -1,0 +1,6 @@
+int main() {
+  int five = 5;
+
+  print(fine);
+  return 0;
+}

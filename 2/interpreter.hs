@@ -136,7 +136,7 @@ transStmt (Ass (Ident name) expr) = do
 transStmt (ListAss ident@(Ident name) expr1 expr2) = do
   (VList list) <- transIdent ident
   (VInt index) <- transExpr expr1
-  if index > (toInteger $ length list)
+  if index > (toInteger $ length list) || index < 0
     then throwError $ "index " ++ (show index) ++ " out of range"
     else do
       env   <- ask

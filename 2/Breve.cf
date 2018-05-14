@@ -26,7 +26,7 @@ Ass.       Stmt ::= Ident "=" Expr  ";" ;
 
 ListAss.   Stmt ::= Ident "[" Expr "]" "=" Expr  ";" ;
 
-DictAss.   Stmt ::= Ident "{" Expr "}" "=" Expr  ";" ;
+DictAss.   Stmt ::= Ident "{{" Expr "}}" "=" Expr  ";" ;
 
 Ret.       Stmt ::= "return" Expr ";" ;
 
@@ -60,21 +60,19 @@ separator  Stmt "" ;
 
 -- Types ---------------------------------------------------
 
-Int.       Type1 ::= "int" ;
+Int.       Type ::= "int" ;
 
-Str.       Type1 ::= "str" ;
+Str.       Type ::= "str" ;
 
-Bool.      Type1 ::= "bool" ;
+Bool.      Type ::= "bool" ;
 
 Void.      Type ::= "void" ;
 
-List.      Type ::= "[" Type1 "]" ;
+List.      Type ::= "[" Type "]" ;
 
-Dict.      Type ::= "{" Type1 "," Type1 "}" ;
+Dict.      Type ::= "{{" Type "," Type "}}" ;
 
 internal   Fun. Type ::= Type "(" [Type] ")" ;
-
-coercions  Type 1 ;
 
 separator  Type "," ;
 
@@ -108,9 +106,9 @@ ENewList.  Expr6 ::= "[]" ;
 
 EValList.  Expr6 ::= Ident "[" Expr "]" ;
 
-ENewDict.  Expr6 ::= "{}" ;
+ENewDict.  Expr6 ::= "{{}}" ;
 
-EValDict.  Expr6 ::= Ident "{" Expr "}" ;
+EValDict.  Expr6 ::= Ident "{{" Expr "}}" ;
 
 Neg.       Expr5 ::= "-" Expr6 ;
 

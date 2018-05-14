@@ -1,0 +1,7 @@
+int main() {
+  {str, int} x = {{}};
+
+  x{{"forty two"}} = 42;
+  print(x{{"forty one"}});
+  return 0;
+}

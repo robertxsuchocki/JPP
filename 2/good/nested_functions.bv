@@ -13,6 +13,7 @@ int main () {
     }
     return power(x,2);
   }
+
   x = squared(x);
   # x == 36
   if (x + y == 42) {

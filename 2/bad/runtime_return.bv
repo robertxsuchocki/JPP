@@ -1,0 +1,10 @@
+int x(bool y) {
+  if (y) {
+    break;
+  }
+  return 0;
+}
+int main() {
+  int y = x(true);
+  return 0;
+}

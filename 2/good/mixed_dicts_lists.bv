@@ -1,0 +1,21 @@
+int main () {
+  {{str,[int]}} x = {{}};
+  [int] tmp = [];
+  [int] y;
+
+  tmp[0] = 4;
+  tmp[1] = 2;
+  x{{"42"}} = tmp;
+  tmp = [];
+
+  y = x{{"42"}};
+  if (length(y) == 2) {
+    x{{"42"}} = [];
+    y = x{{"42"}};
+    if (length(y) == 0) {
+      println("success!");
+      # prints success! instead
+    }
+  }
+  return 0;
+}

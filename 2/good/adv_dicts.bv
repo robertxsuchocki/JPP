@@ -1,0 +1,30 @@
+{{bool,{{str,int}}}} empty_false_dict({{bool,{{str,int}}}} dict) {
+  dict{{false}} = {{}};
+  return dict;
+}
+int main () {
+  {{bool,{{str,int}}}} x = {{}};
+  {{str,int}} tmp;
+
+  for i = 0..1 do {
+    tmp = {{}};
+    for i = 0..10 do {
+      tmp{{toStr(i)}} = i;
+    }
+    x{{i==1}} = tmp;
+  }
+  x = empty_false_dict(x);
+  tmp = x{{false}};
+  if (!(has_key(tmp, "0"))) {
+    {{str,int}} truth = x{{true}};
+
+    int four = truth{{"4"}};
+    int ten = truth{{"10"}};
+    int two = truth{{"2"}};
+    if (four * ten + two == 42) {
+      println("success!");
+      # prints success!
+    }
+  }
+  return 0;
+}

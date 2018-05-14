@@ -4,6 +4,7 @@
 }
 int main () {
   [int] x;
+
   x = [];
   for i = 0..8 do {
     x[i] = i;
