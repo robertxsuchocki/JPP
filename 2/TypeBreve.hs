@@ -123,10 +123,11 @@ validDecl (FunDecl type_ (Ident name) args block) = do
   let env'' = (M.insert "return" type_ (M.insert name fun env'))
 
   valid_b <- local (\_ -> env'') (validBlock block)
-  let valid_a = idents == (nub idents)
   valid_r <- hasReturnClause stmts
+  let valid_a = idents == (nub idents)
+  let valid_v = all (/= Void) (argsTypes args)
 
-  if (valid_b && valid_a && (valid_r || type_ == Void))
+  if (valid_b && (valid_r || type_ == Void) && valid_a && valid_v)
     then return (M.insert name fun env)
     else return M.empty
 

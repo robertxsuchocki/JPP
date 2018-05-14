@@ -14,6 +14,7 @@ import Data.Map (Map, (!))
 import qualified Data.Map as M
 import Data.Maybe
 
+import System.Environment
 import System.IO
 
 
@@ -65,9 +66,10 @@ transIdent (Ident name) = do
   env   <- ask
   store <- get
   let loc = fromMaybe 0 (M.lookup name env)
-  case (M.lookup loc store) of
-    (Just value) -> return value
-    _            -> throwError $ "uninitialized variable " ++ (show name)
+  let value = fromMaybe VVoid (M.lookup loc store)
+  case value of
+    VVoid -> throwError $ "uninitialized variable " ++ (show name)
+    _     -> return value
 
 
 transArg :: [(Arg, Value)] -> RESIO Env
@@ -86,12 +88,7 @@ transDecl :: Decl -> RESIO (Env -> Env)
 
 transDecl (VarDecl type_ (NoInit (Ident name))) = do
   loc <- alloc
-  let value = case type_ of Int      -> (VInt 0)
-                            Bool     -> (VBool False)
-                            Str      -> (VStr "")
-                            List _   -> (VList [])
-                            Dict _ _ -> (VDict M.empty)
-  modify (M.insert loc value)
+  modify (M.insert loc VVoid)
   return $ M.insert name loc
 
 transDecl (VarDecl _ (Init (Ident name) expr)) = do
@@ -382,7 +379,10 @@ runProg prog = do
 
 main :: IO ()
 main = do
-  code <- getContents
+  args <- getArgs
+  let contents = case args of []    -> getContents
+                              (f:_) -> readFile f
+  code <- contents
   let prog = pProgram (myLexer code)
   case prog of
     (Ok tree) -> do

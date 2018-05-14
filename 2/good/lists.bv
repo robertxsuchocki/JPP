@@ -1,16 +1,23 @@
+[int] forty_two_first([int] list) {
+  list[0] = 42;
+  return list;
+}
 int main () {
   [int] x;
-  x[0] = 42;
-  for i = 1..8 do {
+  x = [];
+  for i = 0..8 do {
     x[i] = i;
   }
   x[9] = 10;
   if (length(x) == x[9]) {
-    println("success!");
-    # prints success!
-  } else {
-    x[42] = 0;
-    # this would produce an error
+    x = forty_two_first(x);
+    if (x[0] == 42) {
+      println("success!");
+      # prints success!
+      return 0;
+    }
   }
+  x[42] = 0;
+  # this would produce an error
   return 0;
 }

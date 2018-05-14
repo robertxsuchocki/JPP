@@ -18,8 +18,8 @@ cabal.sandbox.config
 .stack-work/
 cabal.project.local
 .HTF/
+
 Abs*
-Breve
 Doc*
 Err*
 Lex*
@@ -27,3 +27,5 @@ Par*
 Print*
 Skel*
 Test*
+interpreter
+
