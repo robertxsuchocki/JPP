@@ -12,19 +12,10 @@ import Control.Monad.Trans.Reader
 
 import Data.Map (Map, (!))
 import qualified Data.Map as M
-
 import Data.Maybe
 
 import System.IO
 
-data Value = VVoid | VInt Integer | VBool Bool | VStr String | VList [Value]
-           | VDict (M.Map Value Value) | VFunc Env [Arg] Block
-  deriving (Eq, Ord, Show, Read)
-
-data Flow = Normal | Returned Value | Broken | Continued
-  deriving (Eq, Ord, Show, Read)
-
-type Op a b = a -> a -> b
 
 type Env = M.Map String Loc
 
@@ -34,6 +25,13 @@ type Store = M.Map Loc Value
 
 type RESIO a = ReaderT Env (ExceptT String (StateT Store IO)) a
 
+data Value = VVoid | VInt Integer | VBool Bool | VStr String | VList [Value]
+           | VDict (M.Map Value Value) | VFunc Type Env [Arg] Block
+  deriving (Eq, Ord)
+
+data Flow = Normal | Returned Value | Broken | Continued
+
+
 alloc :: RESIO Loc
 alloc = do
   store <- get
@@ -41,46 +39,10 @@ alloc = do
     then return 0
     else let (loc, value) = M.findMax store in return $ loc + 1
 
-forStep :: Loc -> Integer -> Integer -> Stmt -> RESIO Flow
-forStep loc value1 value2 stmt = do
-  modify (M.insert loc (VInt value1))
-  flow <- transStmt stmt
-  case flow of
-    Returned value -> return $ Returned value
-    Broken         -> return Normal
-    _              -> do
-      if (value1 == value2)
-        then return Normal
-        else do
-          let diff = signum (value2 - value1)
-          forStep loc (value1 + diff) value2 stmt
-
-
-transIdent :: Ident -> RESIO Value
-transIdent (Ident ident) = do
-  env   <- ask
-  store <- get
-  let loc = fromMaybe 0 (M.lookup ident env)
-  case (M.lookup loc store) of
-    (Just value) -> return value
-    _            -> throwError $ "uninitialized variable " ++ (show ident)
-
 
 transProgram :: Program -> RESIO ()
 transProgram (Program decls) =
   void $ transBlock (Block decls [(SExp (EApp (Ident "main") []))])
-
-
-transArg :: [(Arg, Value)] -> RESIO Env
-
-transArg [] = do
-  env <- ask
-  return env
-
-transArg (((Arg _ (Ident ident)), value):args) = do
-  loc   <- alloc
-  modify (M.insert loc value)
-  local (M.insert ident loc) (transArg args)
 
 
 transBlock :: Block -> RESIO Flow
@@ -98,39 +60,102 @@ transBlock (Block [] (s:ss)) = do
 transBlock (Block _ []) = return Normal
 
 
+transIdent :: Ident -> RESIO Value
+transIdent (Ident name) = do
+  env   <- ask
+  store <- get
+  let loc = fromMaybe 0 (M.lookup name env)
+  case (M.lookup loc store) of
+    (Just value) -> return value
+    _            -> throwError $ "uninitialized variable " ++ (show name)
+
+
+transArg :: [(Arg, Value)] -> RESIO Env
+
+transArg [] = do
+  env <- ask
+  return env
+
+transArg (((Arg _ (Ident name)), value):args) = do
+  loc   <- alloc
+  modify (M.insert loc value)
+  local (M.insert name loc) (transArg args)
+
+
+transDecl :: Decl -> RESIO (Env -> Env)
+
+transDecl (VarDecl type_ (NoInit (Ident name))) = do
+  loc <- alloc
+  let value = case type_ of Int      -> (VInt 0)
+                            Bool     -> (VBool False)
+                            Str      -> (VStr "")
+                            List _   -> (VList [])
+                            Dict _ _ -> (VDict M.empty)
+  modify (M.insert loc value)
+  return $ M.insert name loc
+
+transDecl (VarDecl _ (Init (Ident name) expr)) = do
+  loc   <- alloc
+  value <- transExpr expr
+  modify (M.insert loc value)
+  return $ M.insert name loc
+
+transDecl (FunDecl type_ (Ident name) args block) = do
+  env  <- ask
+  loc  <- alloc
+  modify (M.insert loc (VFunc type_ (M.insert name loc env) args block))
+  return $ M.insert name loc
+
+
+forStep :: Loc -> Integer -> Integer -> Stmt -> RESIO Flow
+
+forStep loc value1 value2 stmt = do
+  modify (M.insert loc (VInt value1))
+  flow <- transStmt stmt
+  case flow of
+    Returned value -> return $ Returned value
+    Broken         -> return Normal
+    _              -> do
+      if (value1 == value2)
+        then return Normal
+        else do
+          let diff = signum (value2 - value1)
+          forStep loc (value1 + diff) value2 stmt
+
+
 transStmt :: Stmt -> RESIO Flow
 
 transStmt Empty = return Normal
 
 transStmt (BStmt block) = do transBlock block
 
-transStmt (Ass (Ident ident) expr) = do
+transStmt (Ass (Ident name) expr) = do
   env   <- ask
   value <- transExpr expr
-  let loc = fromMaybe 0 (M.lookup ident env)
+  let loc = fromMaybe 0 (M.lookup name env)
   modify (M.insert loc value)
   return Normal
 
-transStmt (ListAss (Ident ident) expr1 expr2) = do
-  (VList list) <- transIdent (Ident ident)
+transStmt (ListAss ident@(Ident name) expr1 expr2) = do
+  (VList list) <- transIdent ident
   (VInt index) <- transExpr expr1
   if index > (toInteger $ length list)
     then throwError $ "index " ++ (show index) ++ " out of range"
     else do
       env   <- ask
       value <- transExpr expr2
-      let loc   = fromMaybe 0 (M.lookup ident env)
+      let loc   = fromMaybe 0 (M.lookup name env)
       let list' = (take (fromIntegral index) list) ++ [value]
                     ++ (drop (fromIntegral (index + 1)) list)
       modify (M.insert loc (VList list'))
       return Normal
 
-transStmt (DictAss (Ident ident) expr1 expr2) = do
-  (VDict dict) <- transIdent (Ident ident)
+transStmt (DictAss ident@(Ident name) expr1 expr2) = do
+  (VDict dict) <- transIdent ident
   env   <- ask
   key   <- transExpr expr1
   value <- transExpr expr2
-  let loc   = fromMaybe 0 (M.lookup ident env)
+  let loc   = fromMaybe 0 (M.lookup name env)
   modify (M.insert loc (VDict (M.insert key value dict)))
   return Normal
 
@@ -163,11 +188,11 @@ transStmt (While expr stmt) = do
         _              -> transStmt (While expr stmt)
     else do return Normal
 
-transStmt (For (Ident ident) expr1 expr2 stmt) = do
+transStmt (For (Ident name) expr1 expr2 stmt) = do
   (VInt value1) <- transExpr expr1
   (VInt value2) <- transExpr expr2
   loc <- alloc
-  local (M.insert ident loc) (forStep loc value1 value2 stmt)
+  local (M.insert name loc) (forStep loc value1 value2 stmt)
   modify (M.delete loc)
   return Normal
 
@@ -187,48 +212,28 @@ transStmt (PrintLn expr) = do
   transStmt (Print expr)
   transStmt (Print (EStr "\n"))
 
-transStmt (DictDel (Ident ident) expr) = do
-  (VDict dict) <- transIdent (Ident ident)
+transStmt (DictDel ident@(Ident name) expr) = do
+  (VDict dict) <- transIdent ident
   env <- ask
   key <- transExpr expr
-  let loc = fromMaybe 0 (M.lookup ident env)
+  let loc = fromMaybe 0 (M.lookup name env)
   modify (M.insert loc (VDict (M.delete key dict)))
   return Normal
 
 
-transDecl :: Decl -> RESIO (Env -> Env)
-
-transDecl (VarDecl _ (NoInit (Ident ident))) = do
-  loc <- alloc
-  modify (M.insert loc VVoid)
-  return $ M.insert ident loc
-
-transDecl (VarDecl _ (Init (Ident ident) expr)) = do
-  loc   <- alloc
-  value <- transExpr expr
-  modify (M.insert loc value)
-  return $ M.insert ident loc
-
-transDecl (FunDecl _ (Ident ident) args block) = do
-  env  <- ask
-  loc  <- alloc
-  modify (M.insert loc (VFunc (M.insert ident loc env) args block))
-  return $ M.insert ident loc
-
-
 transExpr :: Expr -> RESIO Value
 
-transExpr (Incr (Ident ident)) = do
+transExpr (Incr ident@(Ident name)) = do
   env <- ask
-  let loc = fromMaybe 0 (M.lookup ident env)
-  (VInt value) <- transIdent (Ident ident)
+  let loc = fromMaybe 0 (M.lookup name env)
+  (VInt value) <- transIdent ident
   modify (M.insert loc (VInt (value + 1)))
   return $ VInt value
 
-transExpr (Decr (Ident ident)) = do
+transExpr (Decr ident@(Ident name)) = do
   env <- ask
-  let loc = fromMaybe 0 (M.lookup ident env)
-  (VInt value) <- transIdent (Ident ident)
+  let loc = fromMaybe 0 (M.lookup name env)
+  (VInt value) <- transIdent ident
   modify (M.insert loc (VInt (value - 1)))
   return $ VInt value
 
@@ -259,10 +264,10 @@ transExpr (ELitTrue) = return $ VBool True
 
 transExpr (ELitFalse) = return $ VBool False
 
-transExpr (EApp ident exprs) = do
+transExpr (EApp ident@(Ident name) exprs) = do
   store  <- get
   values <- mapM transExpr exprs
-  (VFunc env args block) <- transIdent ident
+  (VFunc type_ env args block) <- transIdent ident
 
   env'   <- local (\_ -> env) (transArg (zip args values))
   flow   <- local (\_ -> env') (transBlock block)
@@ -272,7 +277,11 @@ transExpr (EApp ident exprs) = do
 
   case flow of
     (Returned value) -> return value
-    _                -> return VVoid
+    _                -> do
+      if (type_ /= Void)
+        then throwError $ "function " ++ (show name) ++
+          " of non-void type didn't return value"
+        else return VVoid
 
 transExpr (EStr string) = return $ VStr string
 
@@ -340,20 +349,20 @@ transExpr (EOr expr1 expr2) = do
   return $ VBool ((||) value1 value2)
 
 
-transAddOp :: AddOp -> RESIO (Op Integer Integer)
+transAddOp :: AddOp -> RESIO (Integer -> Integer -> Integer)
 transAddOp x = case x of
   Plus  -> return (+)
   Minus -> return (-)
 
 
-transMulOp :: MulOp -> RESIO (Op Integer Integer)
+transMulOp :: MulOp -> RESIO (Integer -> Integer -> Integer)
 transMulOp x = case x of
   Times -> return (*)
   Div   -> return div
   Mod   -> return mod
 
 
-transRelOp :: RelOp -> RESIO (Op Integer Bool)
+transRelOp :: RelOp -> RESIO (Integer -> Integer -> Bool)
 transRelOp x = case x of
   LTH -> return (<)
   LE  -> return (<=)

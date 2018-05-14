@@ -1,6 +1,5 @@
 int main () {
   {str,int} in_words;
-  in_words = {};
   in_words{"forty two"} = 42;
   if (has_key(in_words,"forty two")) {
     del_key(in_words,"forty two");
