@@ -6,7 +6,7 @@ import ParBreve
 import TypeBreve
 import ErrM
 
-import Control.Monad.Except
+import Control.Monad.Error
 import Control.Monad.State
 import Control.Monad.Trans.Reader
 
@@ -24,7 +24,7 @@ type Loc = Integer
 
 type Store = M.Map Loc Value
 
-type RESIO a = ReaderT Env (ExceptT String (StateT Store IO)) a
+type RESIO a = ReaderT Env (ErrorT String (StateT Store IO)) a
 
 data Value = VVoid | VInt Integer | VBool Bool | VStr String | VList [Value]
            | VDict (M.Map Value Value) | VFunc Type Env [Arg] Block
@@ -371,7 +371,7 @@ transRelOp x = case x of
 
 runProg :: Program -> IO ()
 runProg prog = do
-  res <- runStateT (runExceptT (runReaderT (transProgram prog) M.empty)) M.empty
+  res <- runStateT (runErrorT (runReaderT (transProgram prog) M.empty)) M.empty
   case res of
     ((Left message), _) -> do hPutStr stderr $ "Error: " ++ message ++ "\n"
     _                   -> do return ()

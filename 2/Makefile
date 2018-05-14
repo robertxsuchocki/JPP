@@ -1,10 +1,10 @@
 all: bnfc
 	happy -gcai ParBreve.y
 	alex -g LexBreve.x
-	/home/students/inf/PUBLIC/MRJP/ghc-8.2.2/bin --make interpreter.hs -o interpreter
+	ghc --make interpreter.hs -o interpreter
 
-bnfc: breve.cf
-	bnfc breve.cf
+bnfc: Breve.cf
+	bnfc Breve.cf
 
 clean:
 	rm Abs* Doc* Err* Lex* Par* Print* Skel* Test*
