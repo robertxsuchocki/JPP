@@ -1,0 +1,23 @@
+void exclamation_mark() {
+  println("!");
+}
+int main() {
+  int x;
+
+  ;
+  {
+    x = 0;
+  }
+  if (true) {
+    print("su");
+  }
+  while (x++ < 2) {
+    print("c");
+  }
+  print("e");
+  for i = 0..1 do {
+    print("s");
+  }
+  exclamation_mark();
+  return 0;
+}

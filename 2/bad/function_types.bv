@@ -1,0 +1,10 @@
+int x(str y,bool z) {
+  return 0;
+}
+int main() {
+  int x;
+  bool y;
+  str z;
+
+  x(y, z);
+}

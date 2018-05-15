@@ -1,0 +1,6 @@
+int main() {
+  [int] x = [];
+
+  x{{0}} = 42;
+  return 0;
+}

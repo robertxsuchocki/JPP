@@ -1,0 +1,12 @@
+str success() {
+  return "success!";
+}
+int main() {
+  str a = "";
+  str b = "forty two";
+  str c = toStr(42);
+  str d = success();
+  println(d);
+  # prints success!
+  return 0;
+}

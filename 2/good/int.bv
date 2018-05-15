@@ -1,0 +1,16 @@
+int zero() {
+  return 0;
+}
+int main() {
+  int a = 42;
+  int b = a++;
+  int c = b--;
+  int d = toInt("42");
+  int e = zero();
+  int f = -a;
+  int g = d * e + f;
+  int h = f % g;
+  println("success!");
+  # prints success!
+  return 0;
+}

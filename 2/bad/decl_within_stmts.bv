@@ -1,7 +1,10 @@
 int main() {
   int x = 0;
   str y = "42";
+
   print(y);
+
   bool z = false;
+
   return 0;
 }

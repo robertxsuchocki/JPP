@@ -17,6 +17,8 @@ import Data.Maybe
 import System.Environment
 import System.IO
 
+import Text.Read (readMaybe)
+
 
 type Env = M.Map String Loc
 
@@ -240,6 +242,10 @@ transExpr (EIntStr expr) = do
 
 transExpr (EStrInt expr) = do
   (VStr value) <- transExpr expr
+  case (readMaybe value::Maybe Integer) of
+    (Just int) -> return $ VInt int
+    _          -> throwError $ "wrong argument " ++ value
+                    ++ " for function toInt"
   return $ VInt (read value::Integer)
 
 transExpr (ListLen ident) = do
@@ -316,12 +322,12 @@ transExpr (EMul expr1 mulop expr2) = do
   (VInt value1) <- transExpr expr1
   (VInt value2) <- transExpr expr2
   op <- transMulOp mulop
-  case op of
-    div -> do
+  case mulop of
+    Div -> do
       if (value2 == 0)
         then throwError "division by zero"
         else return $ VInt (op value1 value2)
-  return $ VInt (op value1 value2)
+    _   -> return $ VInt (op value1 value2)
 
 transExpr (EAdd expr1 addop expr2) = do
   (VInt value1) <- transExpr expr1

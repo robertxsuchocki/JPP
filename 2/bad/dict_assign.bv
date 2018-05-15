@@ -1,0 +1,6 @@
+int main() {
+  {{int, str}} x = {{}};
+
+  x[0] = "zero";
+  return 0;
+}

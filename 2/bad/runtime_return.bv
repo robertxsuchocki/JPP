@@ -6,5 +6,6 @@ int x(bool y) {
 }
 int main() {
   int y = x(true);
+
   return 0;
 }

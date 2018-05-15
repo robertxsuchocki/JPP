@@ -1,5 +1,6 @@
 [[int]] forty_two_all_in_first([[int]] list) {
   [int] tmp = list[0];
+
   int len = length(tmp);
   for i = 0..len-1 do {
     tmp[i] = 42;

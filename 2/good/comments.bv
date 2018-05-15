@@ -1,0 +1,10 @@
+int main() {
+  //  Completely forgotten about save for the scars we carry beneath our poorly fitted clothes
+  #   White rags tied to old bones that signal surrender without dignity
+  /*
+      A defeat less gracious and more begrudged
+      Because even children are capable of love,
+  */
+  println("success!"); #                          but we weren't
+  return 0;
+}
