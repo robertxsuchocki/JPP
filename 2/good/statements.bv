@@ -19,5 +19,6 @@ int main() {
     print("s");
   }
   exclamation_mark();
+  # finishes printing success!
   return 0;
 }

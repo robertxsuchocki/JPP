@@ -17,7 +17,7 @@ int main () {
   x = squared(x);
   # x == 36
   if (x + y == 42) {
-    println("success!")
+    println("success!");
     # prints success!
   }
   return 0;

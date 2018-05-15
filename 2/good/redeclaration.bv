@@ -1,0 +1,8 @@
+int main() {
+  int x = 0;
+  str x = "";
+  bool x = true;
+  println("success!");
+  # prints success!
+  return 0;
+}
