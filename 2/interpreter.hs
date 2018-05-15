@@ -8,7 +8,7 @@ import ErrM
 
 import Control.Monad.Except
 import Control.Monad.State
-import Control.Monad.Trans.Reader
+import Control.Monad.Reader
 
 import Data.Map (Map, (!))
 import qualified Data.Map as M

@@ -8,8 +8,9 @@ int main() {
   int d = toInt("42");
   int e = zero();
   int f = -a;
-  int g = d * e + f;
-  int h = f % g;
+  int g = d * (e + f);
+  int h = (f % g) / 2;
+  int i = g % h;
 
   println("success!");
   # prints success!

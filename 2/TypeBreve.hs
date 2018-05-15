@@ -2,8 +2,7 @@ module TypeBreve where
 
 import AbsBreve
 
-import Control.Monad.Trans
-import Control.Monad.Trans.Reader
+import Control.Monad.Reader
 
 import Data.List
 import Data.Map (Map, (!))
