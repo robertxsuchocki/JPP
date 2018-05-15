@@ -1,5 +1,6 @@
 int main() {
   int x = toInt("forty two");
+
   print(x);
   return 0;
 }
