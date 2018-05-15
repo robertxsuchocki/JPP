@@ -5,7 +5,7 @@ int main () {
 
   if (x) {
     while (z) {
-      for 1 in y..false do {
+      for i = y..false do {
         return;
       }
     }

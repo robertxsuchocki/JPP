@@ -1,5 +1,5 @@
 int main() {
-  {str, int} x = {{}};
+  {{str, int}} x = {{}};
 
   x{{"forty two"}} = 42;
   print(x{{"forty one"}});
