@@ -31,3 +31,31 @@ maxi(A, B, Z) :- A =< B -> Z=B ; Z=A.
 
 zrobListe(0, []) :- !.
 zrobListe(A, [A|L]) :- B is A-1, zrobListe(B, L).
+
+dlugosc(L, X) :- dlugosc(L, 0, X).
+dlugosc([], A, A).
+dlugosc([E|L], A, B) :- C is A+1, dlugosc(L, C, B).
+
+min([E|L], M) :- szukaj(L, E, M).
+szukaj([], M, M).
+szukaj([E1|L], E2, M) :- E1>=E2, !, szukaj(L, E2, M).
+szukaj([E1|L], E2, M) :- E1<E2, szukaj(L, E1, M).
+
+odwroc(L, R) :- odwroc(L, [], R).
+odwroc([], R, R).
+odwroc([E|L], A, R) :- odwroc(L, [E|A], R).
+
+odwroc2(L, R) :- rownaDlugosc(L, R), odwroc(L, [], R).
+
+rownaDlugosc([], []).
+rownaDlugosc([_|L1], [_|L2]) :- rownaDlugosc(L1, L2).
+
+palindrom(L) :- odwroc(L, L).
+
+slowo(S) :- slowo(S, []).
+slowo([a|S], A) :- slowo(S, [b|A]).
+slowo(S, S).
+
+fp5(L, F) :- fp5(L, C, F, C).
+fp5([b|L], C, [b|F], R) :- fp5(L, C, F, R).
+fp5([c|L], [c|C], F, R) :- fp5(L, C, F, R).
