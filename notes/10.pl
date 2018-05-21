@@ -32,6 +32,11 @@ maxi(A, B, Z) :- A =< B -> Z=B ; Z=A.
 zrobListe(0, []) :- !.
 zrobListe(A, [A|L]) :- B is A-1, zrobListe(B, L).
 
+zrobliste(0, EL, K, W) :- write(EL), write(' '), write(W), nl, K=W, !.
+zrobliste(A, EL, [A|L], W) :- B is A-1, write(EL), write(' '), write(W), nl, zrobliste(B, EL, L, [A|W]).
+
+zrobliste(A, L) :- zrobliste(A, L, L, []).
+
 dlugosc(L, X) :- dlugosc(L, 0, X).
 dlugosc([], A, A).
 dlugosc([E|L], A, B) :- C is A+1, dlugosc(L, C, B).
@@ -59,3 +64,4 @@ slowo(S, S).
 fp5(L, F) :- fp5(L, C, F, C).
 fp5([b|L], C, [b|F], R) :- fp5(L, C, F, R).
 fp5([c|L], [c|C], F, R) :- fp5(L, C, F, R).
+
