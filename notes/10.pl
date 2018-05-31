@@ -65,3 +65,46 @@ fp5(L, F) :- fp5(L, C, F, C).
 fp5([b|L], C, [b|F], R) :- fp5(L, C, F, R).
 fp5([c|L], [c|C], F, R) :- fp5(L, C, F, R).
 
+
+qsort([], []).
+qsort([X | L], S) :-
+      partition(L, X, M, W),
+      qsort(M, SM),
+      qsort(W, SW),
+      append(SM, [X|SW], S).   % a co gdyby bylo: append(SM, SW, S) ?
+
+
+partition([], _, [], []).
+partition([X | L ], E, [X | Lm], Lw) :-  X =< E, !, partition(L, E, Lm, Lw).
+partition([X | L ], E, Lm, [X | Lw]) :-  partition(L, E, Lm, Lw).
+
+
+qsortA(L, S) :-  qsortA(L, [], S).
+
+qsortA([], S, S).
+qsortA([X | L], Akum, Sort) :-
+      partition(L, X, L1, L2),
+      qsortA(L2, Akum, S2),
+      qsortA(L1, [X | S2], Sort).
+
+
+qsortLog(L, S) :- qsortLog(L, [], S).
+
+qsortLog([], S, S).
+qsortLog([H | T], A, S) :-
+     partition(T, H, M, W, 0, R),
+     qsortLogPom(H, A, M, W, R, S).
+
+qsortLogPom(H, A, Lm, Lw, R, S) :-
+    R >= 0, !, qsortLog(Lw, A, SLw), qsortLog(Lm, [H | SLw], S).
+qsortLogPom(H, A, Lm, Lw, R, S) :-
+    R < 0, qsortLog(Lm, [H | SLw], S), qsortLog(Lw, A, SLw).
+
+
+partition([], _, [], [], S, S).
+partition([A | L], X, [A | M], D, S, W) :-
+     A =< X, !, NS is S+1,
+     partition(L, X, M, D, NS, W).
+partition([A | L], X, M, [A | D], S, W):-
+     A > X, NS is S-1,
+     partition(L, X, M, D, NS, W).
