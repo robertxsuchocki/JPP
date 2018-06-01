@@ -15,11 +15,13 @@ wyborWierzcholka([V, e, _R | AEGraf], [V, e, S]) :-
 usunWierzcholek([AEWierz | AEGraf], AEGraf, Wierz) :-
   wyborWierzcholka(AEWierz, Wierz).
 usunWierzcholek([AEWierz | AEGraf], [AEWierz | AENowy], Wierz) :-
-  \+wyborWierzcholka(AEWierz, Wierz), usunWierzcholek(AEGraf, AENowy, Wierz).
+  \+ wyborWierzcholka(AEWierz, Wierz),
+  usunWierzcholek(AEGraf, AENowy, Wierz).
 
 jestWyborem([], []).
 jestWyborem(AEGraf, [Wierz | Graf]) :-
-  usunWierzcholek(AEGraf, AENowy, Wierz), jestWyborem(AENowy, Graf).
+  usunWierzcholek(AEGraf, AENowy, Wierz),
+  jestWyborem(AENowy, Graf).
 
 
 
@@ -40,7 +42,8 @@ walkWithCheck(Graf, [V, T | Reszta], Visited, Visited2) :-
   walk(Graf, [V, T | Reszta], Visited1, Visited2).
 walkWithCheck(_Graf, [V, _T], Visited, Visited1) :-
   check(V, Visited, Visited1).
-walkWithCheck(_Graf, [V | _], Visited, Visited) :- member(V, Visited).
+walkWithCheck(_Graf, [V | _Reszta], Visited, Visited) :-
+  member(V, Visited).
 
 walk(Graf, [V, T | Reszta], Visited, Visited2) :-
   wezDowolnaNazwe(Reszta, Reszta2, Nazwa),
@@ -54,7 +57,9 @@ jestDFS([G | Graf], Lista) :-
 
 
 
-jestADFS(AEgraf, Lista) :- jestWyborem(AEgraf, Graf), jestDFS(Graf, Lista).
+jestADFS(AEgraf, Lista) :-
+  jestWyborem(AEgraf, Graf),
+  jestDFS(Graf, Lista).
 
 
 
