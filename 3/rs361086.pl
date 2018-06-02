@@ -21,6 +21,14 @@ jestWyborem(AEGraf, [Wierz | Graf]) :-
   jestWyborem(AENowy, Graf).
 
 
+pominOdwiedzone([], _Visited, []).
+pominOdwiedzone([Nazwa | Reszta], Visited, Wynik) :-
+  member(Nazwa, Visited),
+  pominOdwiedzone(Reszta, Visited, Wynik).
+pominOdwiedzone([Nazwa | Reszta], Visited, [Nazwa | Wynik]) :-
+  \+ member(Nazwa, Visited),
+  pominOdwiedzone(Reszta, Visited, Wynik).
+
 wezDowolnaNazwe([Nazwa | Nazwy], Nazwy, Nazwa).
 wezDowolnaNazwe([Nazwa1 | Nazwy1], [Nazwa1 | Nazwy2], Nazwa2) :-
   wezDowolnaNazwe(Nazwy1, Nazwy2, Nazwa2).
@@ -30,7 +38,7 @@ znajdzWierzcholek([_G | Graf], Nazwa, Wierz) :-
   znajdzWierzcholek(Graf, Nazwa, Wierz).
 
 check(Name, Visited1, Visited2) :-
-  nonmember(Name, Visited1),
+  \+ member(Name, Visited1),
   append(Visited1, [Name], Visited2).
 
 walkWithCheck(Graf, [V, T, R | Reszta], Visited, Visited2) :-
@@ -41,8 +49,11 @@ walkWithCheck(_Graf, [V, _T], Visited, Visited1) :-
 walkWithCheck(_Graf, [V | _Reszta], Visited, Visited) :-
   member(V, Visited).
 
+walk(_Graf, [_V, _T, R | Reszta], Visited, Visited) :-
+  pominOdwiedzone([R | Reszta], Visited, []).
 walk(Graf, [V, T, R | Reszta], Visited, Visited2) :-
-  wezDowolnaNazwe([R | Reszta], Reszta2, Nazwa),
+  pominOdwiedzone([R | Reszta], Visited, Reszta1),
+  wezDowolnaNazwe(Reszta1, Reszta2, Nazwa),
   znajdzWierzcholek(Graf, Nazwa, Wierz),
   walkWithCheck(Graf, Wierz, Visited, Visited1),
   walk(Graf, [V, T | Reszta2], Visited1, Visited2).
@@ -65,13 +76,17 @@ walkAEWithCheck(_Graf, [V, _T], Visited, Visited1) :-
 walkAEWithCheck(_Graf, [V | _Reszta], Visited, Visited) :-
   member(V, Visited).
 
+walkAE(_Graf, [_V, _T, R | Reszta], Visited, Visited) :-
+  pominOdwiedzone([R | Reszta], Visited, []).
 walkAE(Graf, [V, a, R | Reszta], Visited, Visited2) :-
-  wezDowolnaNazwe([R | Reszta], Reszta2, Nazwa),
+  pominOdwiedzone([R | Reszta], Visited, Reszta1),
+  wezDowolnaNazwe(Reszta1, Reszta2, Nazwa),
   znajdzWierzcholek(Graf, Nazwa, Wierz),
   walkAEWithCheck(Graf, Wierz, Visited, Visited1),
   walkAE(Graf, [V, a | Reszta2], Visited1, Visited2).
-walkAE(Graf, [V, e, R | Reszta], Visited, Visited1) :-
-  wezDowolnaNazwe([R | Reszta], Reszta2, Nazwa),
+walkAE(Graf, [_V, e, R | Reszta], Visited, Visited1) :-
+  pominOdwiedzone([R | Reszta], Visited, Reszta1),
+  wezDowolnaNazwe(Reszta1, _Reszta2, Nazwa),
   znajdzWierzcholek(Graf, Nazwa, Wierz),
   walkAEWithCheck(Graf, Wierz, Visited, Visited1).
 walkAE(_Graf, [_V, _T], Visited, Visited).
