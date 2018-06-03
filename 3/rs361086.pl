@@ -3,93 +3,93 @@
 :- use_module(library(lists)).
 
 
-wyborWierzcholka([V, a | Reszta], [V, a | Reszta]).
-wyborWierzcholka([V, e], [V, e]).
-wyborWierzcholka([V, e, _R | _AEGraf], [V, e, _R]).
-wyborWierzcholka([V, e, _R | AEGraf], [V, e, S]) :-
-  wyborWierzcholka([V, e | AEGraf], [V, e, S]).
+choiseOfNode([Name, a | Rest], [Name, a | Rest]).
+choiseOfNode([Name, e], [Name, e]).
+choiseOfNode([Name, e, Next | AEGraph], [Name, e, Next]).
+choiseOfNode([Name, e, Next | AEGraph], [Name, e, Node]) :-
+  choiseOfNode([Name, e | AEGraph], [Name, e, Node]).
 
-usunWierzcholek([AEWierz | AEGraf], AEGraf, Wierz) :-
-  wyborWierzcholka(AEWierz, Wierz).
-usunWierzcholek([AEWierz | AEGraf], [AEWierz | AENowy], Wierz) :-
-  \+ wyborWierzcholka(AEWierz, Wierz),
-  usunWierzcholek(AEGraf, AENowy, Wierz).
+matchNodes([AENode | AEGraph], AEGraph, Node) :-
+  choiseOfNode(AENode, Node).
+matchNodes([AENode | AEGraph], [AENode | AENew], Node) :-
+  \+ choiseOfNode(AENode, Node),
+  matchNodes(AEGraph, AENew, Node).
 
 jestWyborem([], []).
-jestWyborem(AEGraf, [Wierz | Graf]) :-
-  usunWierzcholek(AEGraf, AENowy, Wierz),
-  jestWyborem(AENowy, Graf).
+jestWyborem(AEGraph, [Node | Graph]) :-
+  matchNodes(AEGraph, AENew, Node),
+  jestWyborem(AENew, Graph).
 
 
-pominOdwiedzone([], _Visited, []).
-pominOdwiedzone([Nazwa | Reszta], Visited, Wynik) :-
-  member(Nazwa, Visited),
-  pominOdwiedzone(Reszta, Visited, Wynik).
-pominOdwiedzone([Nazwa | Reszta], Visited, [Nazwa | Wynik]) :-
-  \+ member(Nazwa, Visited),
-  pominOdwiedzone(Reszta, Visited, Wynik).
+skipVisited([], Visited, []).
+skipVisited([Name | Rest], Visited, Result) :-
+  member(Name, Visited),
+  skipVisited(Rest, Visited, Result).
+skipVisited([Name | Rest], Visited, [Name | Result]) :-
+  \+ member(Name, Visited),
+  skipVisited(Rest, Visited, Result).
 
-wezDowolnaNazwe([Nazwa | Nazwy], Nazwy, Nazwa).
-wezDowolnaNazwe([Nazwa1 | Nazwy1], [Nazwa1 | Nazwy2], Nazwa2) :-
-  wezDowolnaNazwe(Nazwy1, Nazwy2, Nazwa2).
+takeAnyName([Name | Names], Names, Name).
+takeAnyName([OtherName | Names], [OtherName | NewNames], Name) :-
+  takeAnyName(Names, NewNames, Name).
 
-znajdzWierzcholek([[Nazwa | Reszta] | _Graf], Nazwa, [Nazwa | Reszta]).
-znajdzWierzcholek([_G | Graf], Nazwa, Wierz) :-
-  znajdzWierzcholek(Graf, Nazwa, Wierz).
+findNode([[Name | Rest] | Graph], Name, [Name | Rest]).
+findNode([OtherNode | Graph], Name, Node) :-
+  findNode(Graph, Name, Node).
 
-check(Name, Visited1, Visited2) :-
+markVisited(Name, Visited1, Visited2) :-
   \+ member(Name, Visited1),
   append(Visited1, [Name], Visited2).
 
-walkWithCheck(Graf, [V, T, R | Reszta], Visited, Visited2) :-
-  check(V, Visited, Visited1),
-  walk(Graf, [V, T, R | Reszta], Visited1, Visited2).
-walkWithCheck(_Graf, [V, _T], Visited, Visited1) :-
-  check(V, Visited, Visited1).
-walkWithCheck(_Graf, [V | _Reszta], Visited, Visited) :-
-  member(V, Visited).
+walkWithCheck(Graph, [Name, Type, Next | Rest], Visited1, Visited3) :-
+  markVisited(Name, Visited1, Visited2),
+  walk(Graph, [Name, Type, Next | Rest], Visited2, Visited3).
+walkWithCheck(Graph, [Name, Type], Visited1, Visited2) :-
+  markVisited(Name, Visited1, Visited2).
+walkWithCheck(Graph, [Name | Rest], Visited, Visited) :-
+  member(Name, Visited).
 
-walk(_Graf, [_V, _T, R | Reszta], Visited, Visited) :-
-  pominOdwiedzone([R | Reszta], Visited, []).
-walk(Graf, [V, T, R | Reszta], Visited, Visited2) :-
-  pominOdwiedzone([R | Reszta], Visited, Reszta1),
-  wezDowolnaNazwe(Reszta1, Reszta2, Nazwa),
-  znajdzWierzcholek(Graf, Nazwa, Wierz),
-  walkWithCheck(Graf, Wierz, Visited, Visited1),
-  walk(Graf, [V, T | Reszta2], Visited1, Visited2).
-walk(_Graf, [_V, _T], Visited, Visited).
+walk(Graph, [Name, Type, Next | Rest1], Visited, Visited) :-
+  skipVisited([Next | Rest1], Visited, []).
+walk(Graph, [CurrName, Type, Next | Rest1], Visited1, Visited3) :-
+  skipVisited([Next | Rest1], Visited1, Rest2),
+  takeAnyName(Rest2, Rest3, NextName),
+  findNode(Graph, NextName, Node),
+  walkWithCheck(Graph, Node, Visited1, Visited2),
+  walk(Graph, [CurrName, Type | Rest3], Visited2, Visited3).
+walk(Graph, [Name, Type], Visited, Visited).
 
-jestDFS([G | Graf], Lista) :-
-  walkWithCheck([G | Graf], G, [], Lista).
-
-
-jestADFS(AEgraf, Lista) :-
-  jestWyborem(AEgraf, Graf),
-  jestDFS(Graf, Lista).
+jestDFS([FirstNode | Graph], List) :-
+  walkWithCheck([FirstNode | Graph], FirstNode, [], List).
 
 
-walkAEWithCheck(Graf, [V, T, R | Reszta], Visited, Visited2) :-
-  check(V, Visited, Visited1),
-  walkAE(Graf, [V, T, R | Reszta], Visited1, Visited2).
-walkAEWithCheck(_Graf, [V, _T], Visited, Visited1) :-
-  check(V, Visited, Visited1).
-walkAEWithCheck(_Graf, [V | _Reszta], Visited, Visited) :-
-  member(V, Visited).
+jestADFS(AEGraph, List) :-
+  jestWyborem(AEGraph, Graph),
+  jestDFS(Graph, List).
 
-walkAE(_Graf, [_V, _T, R | Reszta], Visited, Visited) :-
-  pominOdwiedzone([R | Reszta], Visited, []).
-walkAE(Graf, [V, a, R | Reszta], Visited, Visited2) :-
-  pominOdwiedzone([R | Reszta], Visited, Reszta1),
-  wezDowolnaNazwe(Reszta1, Reszta2, Nazwa),
-  znajdzWierzcholek(Graf, Nazwa, Wierz),
-  walkAEWithCheck(Graf, Wierz, Visited, Visited1),
-  walkAE(Graf, [V, a | Reszta2], Visited1, Visited2).
-walkAE(Graf, [_V, e, R | Reszta], Visited, Visited1) :-
-  pominOdwiedzone([R | Reszta], Visited, Reszta1),
-  wezDowolnaNazwe(Reszta1, _Reszta2, Nazwa),
-  znajdzWierzcholek(Graf, Nazwa, Wierz),
-  walkAEWithCheck(Graf, Wierz, Visited, Visited1).
-walkAE(_Graf, [_V, _T], Visited, Visited).
 
-jestADFS1([AE | AEgraf], Lista) :-
-  walkAEWithCheck([AE | AEgraf], AE, [], Lista).
+walkAEWithCheck(Graph, [Name, Type, Next | Rest], Visited, Visited2) :-
+  markVisited(Name, Visited, Visited1),
+  walkAE(Graph, [Name, Type, Next | Rest], Visited1, Visited2).
+walkAEWithCheck(Graph, [Name, Type], Visited, Visited1) :-
+  markVisited(Name, Visited, Visited1).
+walkAEWithCheck(Graph, [Name | Rest], Visited, Visited) :-
+  member(Name, Visited).
+
+walkAE(Graph, [Name, Type, Next | Rest], Visited, Visited) :-
+  skipVisited([Next | Rest], Visited, []).
+walkAE(Graph, [CurrName, a, Next | Rest], Visited, Visited2) :-
+  skipVisited([Next | Rest], Visited, Rest1),
+  takeAnyName(Rest1, Rest2, NextName),
+  findNode(Graph, NextName, Node),
+  walkAEWithCheck(Graph, Node, Visited, Visited1),
+  walkAE(Graph, [CurrName, a | Rest2], Visited1, Visited2).
+walkAE(Graph, [CurrName, e, Next | Rest], Visited, Visited1) :-
+  skipVisited([Next | Rest], Visited, Rest1),
+  takeAnyName(Rest1, Rest2, NextName),
+  findNode(Graph, NextName, Node),
+  walkAEWithCheck(Graph, Node, Visited, Visited1).
+walkAE(Graph, [Name, Type], Visited, Visited).
+
+jestADFS1([FirstNode | AEGraph], List) :-
+  walkAEWithCheck([FirstNode | AEGraph], FirstNode, [], List).
