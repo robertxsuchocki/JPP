@@ -78,17 +78,21 @@ walkAEWithCheck(Graph, [Name | Rest], Visited, Visited) :-
 
 walkAE(Graph, [Name, Type, Next | Rest], Visited, Visited) :-
   skipVisited([Next | Rest], Visited, []).
-walkAE(Graph, [CurrName, a, Next | Rest], Visited, Visited2) :-
-  skipVisited([Next | Rest], Visited, Rest1),
+walkAE(Graph, [CurrName, a, Next | Rest], Visited1, Visited3) :-
+  skipVisited([Next | Rest], Visited1, Rest1),
   takeAnyName(Rest1, Rest2, NextName),
   findNode(Graph, NextName, Node),
-  walkAEWithCheck(Graph, Node, Visited, Visited1),
-  walkAE(Graph, [CurrName, a | Rest2], Visited1, Visited2).
-walkAE(Graph, [CurrName, e, Next | Rest], Visited, Visited1) :-
-  skipVisited([Next | Rest], Visited, Rest1),
-  takeAnyName(Rest1, Rest2, NextName),
+  walkAEWithCheck(Graph, Node, Visited1, Visited2),
+  walkAE(Graph, [CurrName, a | Rest2], Visited2, Visited3).
+walkAE(Graph, [CurrName, e, Next | Rest], Visited, Visited) :-
+  takeAnyName([Next | Rest], Rest1, NextName),
+  member(NextName, Visited).
+walkAE(Graph, [CurrName, e, Next | Rest], Visited1, Visited2) :-
+  takeAnyName([Next | Rest], Rest1, NextName),
+  \+ member(NextName, Visited1),
+  skipVisited(Rest1, Visited1, Rest2),
   findNode(Graph, NextName, Node),
-  walkAEWithCheck(Graph, Node, Visited, Visited1).
+  walkAEWithCheck(Graph, Node, Visited1, Visited2).
 walkAE(Graph, [Name, Type], Visited, Visited).
 
 jestADFS1([FirstNode | AEGraph], List) :-
