@@ -1,8 +1,5 @@
 % Robert Suchocki 361086
 
-:- use_module(library(lists)).
-
-
 % choiceOfNode(A, B) - checks if B can be in a choice of graph containing A,
 % nodes with label a must be identical, nodes with label e are accepted
 % if B contains one from all of node names in A and 0 if A has no edges
@@ -39,16 +36,6 @@ skipVisited([Name | Rest], Visited, [Name | Result]) :-
   \+ member(Name, Visited),
   skipVisited(Rest, Visited, Result).
 
-% takeFirstNew(O, N, F) - checks if O is a prefix of N and if F is the first
-% element of N that is not in the O,
-% used for optimization of working with DFSs on given lists, algorithm won't
-% generate all of the answers by checking every possibility for next node,
-% but take the first node from list given to check that is not already
-% in a produced list and use that node instead
-takeFirstNew([], [New | _News], New).
-takeFirstNew([Old | Olds], [Old | News], New) :-
-  takeFirstNew(Olds, News, New).
-
 % takeNextName(O, N, V) - checks if O contains V and whether N is equal to O
 % without element V,
 % method very similar to matchNodes, but doesn't require additional predicates
@@ -61,57 +48,79 @@ takeNextName([Name | Names], Names, Name).
 takeNextName([OtherName | OldNames], [OtherName | NewNames], Name) :-
   takeNextName(OldNames, NewNames, Name).
 
+% takeFirstNew(O, N, F) - checks if O is a prefix of N and if F is the first
+% element of N that is not in the O,
+% used for optimization of working with DFSs on given lists, algorithm won't
+% generate all of the answers by checking every possibility for next node,
+% but take the first node from list given to check that is not already
+% in a produced list and use that node instead
+takeFirstNew([], [New | _News], New).
+takeFirstNew([Old | Olds], [Old | News], New) :-
+  takeFirstNew(Olds, News, New).
+
 % findNode(G, N, V) - checks if G contains node V with name N,
 % used for receiving full node after choosing name with 2 functions above
 findNode([[Name | Rest] | _Graph], Name, [Name | Rest]).
 findNode([_OtherNode | Graph], Name, Node) :-
   findNode(Graph, Name, Node).
 
-% markVisited(O, N, V) - checks that V is not a member of O and that N is equal
-% to O with V appended at the end of it
-markVisited(List1, List2, Name) :-
-  \+ member(Name, List1),
-  append(List1, [Name], List2).
 
-walkWithCheck(Case, Graph, [Name, Type, Next | Rest], List1, List3, ListR) :-
-  markVisited(List1, List2, Name),
-  walk(Case, Graph, [Name, Type, Next | Rest], List2, List3, ListR).
-walkWithCheck(_Case, _Graph, [Name, _Type], List1, List2, _ListR) :-
-  markVisited(List1, List2, Name).
-walkWithCheck(_Case, _Graph, [Name | _Rest], List, List, _ListR) :-
-  member(Name, List).
+% walk(C, G, V, L1, L2, LR) - does the DFS exploration (or walkthrough)
+% C is the "case" of DFS - ae means AE graph, g means normal graph
+% G stands for graph, V stands for node, both with standard list structure
+% L1, L2 are initial and final node lists, which means L1 has the list of nodes
+% visited before current rule computation and after chained changes to this list
+% as seen below L2 is the final list for this computation
+% LR is final result list of entire DFS, it's there for performance reasons only
+% as it is used in takeFirstNew predicate described above and requires full list
+% to do it's work
 
+% we just accept if there's nowhere to go
 walk(_Case, _Graph, [_Name, _Type], List, List, _ListR).
+% we also accept if every node on list has already been visited
 walk(_Case, _Graph, [_Name, _Type, Next | Rest], List, List, _ListR) :-
   skipVisited([Next | Rest], List, []).
-walk(Case, Graph, [CurrName, Type, Next | Rest1], List1, List3, ListR) :-
-  \+ (Case == ae, Type == e),
-  skipVisited([Next | Rest1], List1, Rest2),
-  takeFirstNew(List1, ListR, NextName),
-  takeNextName(Rest2, Rest3, NextName),
-  findNode(Graph, NextName, Node),
-  walkWithCheck(Case, Graph, Node, List1, List2, ListR),
-  walk(Case, Graph, [CurrName, Type | Rest3], List2, List3, ListR).
+% here, for AE graphs, we accept if node choice leads to visited node
 walk(ae, _Graph, [_CurrName, e, Next | Rest1], List, List, _ListR) :-
   takeNextName([Next | Rest1], _Rest2, NextName),
   member(NextName, List).
-walk(ae, Graph, [_CurrName, e, Next | Rest1], List1, List2, ListR) :-
+% this rule makes the move in a graph
+walk(Case, Graph, [CurrName, Type, Next | Rest1], List1, List4, ListR) :-
+  % firstly, we try to get next node from result list
   takeFirstNew(List1, ListR, NextName),
-  takeNextName([Next | Rest1], Rest2, NextName),
-  \+ member(NextName, List1),
-  skipVisited(Rest2, List1, _Rest3),
+  % we reduce neighbourhood list with already visited nodes
+  skipVisited([Next | Rest1], List1, Rest2),
+  % now we either check if node from result list is valid or choose next name
+  takeNextName(Rest2, Rest3, NextName),
+  % after retrieving name, let's get entire node
   findNode(Graph, NextName, Node),
-  walkWithCheck(ae, Graph, Node, List1, List2, ListR).
+  % now we can append neighbourhood list with next node
+  append(List1, [NextName], List2),
+  % and make a DFS walk for our node
+  walk(Case, Graph, Node, List2, List3, ListR),
+  % if we're not making a AE graph walk for "exists" node
+  (   \+ (Case == ae, Type == e)
+      % we can go to next nodes in list after coming back from just chosen one
+  ->  walk(Case, Graph, [CurrName, Type | Rest3], List3, List4, ListR)
+      % otherwise we stop here, as we went the only way possible, and do nothing
+  ;   append(List3, [], List4)
+  ).
 
 
-jestDFS([FirstNode | Graph], List) :-
-  walkWithCheck(g, [FirstNode | Graph], FirstNode, [], List, List).
+% jestDFS(G, L) - checks if L is a DFS exploration list for G by computing walk
+jestDFS([[Name | Rest] | Graph], List) :-
+  walk(g, [[Name | Rest] | Graph], [Name | Rest], [Name], List, List).
 
-
+% jestADFS(AEG, L) - checks if L is a DFS exploration list for some graph G,
+% that is a choice from AE graph AEG, done by explicitly making a choice of G
+% and then computing a standard DFS exploration, equivalent to jestADFS1
 jestADFS(AEGraph, List) :-
   jestWyborem(AEGraph, Graph),
   jestDFS(Graph, List).
 
-
-jestADFS1([FirstNode | AEGraph], List) :-
-  walkWithCheck(ae, [FirstNode | AEGraph], FirstNode, [], List, List).
+% jestADFS1(AEG, L) - checks if L is a DFS exploration list for some graph G,
+% that is a choice from AE graph AEG, done by computing unusual DFS exploration
+% which implicitly chooses one edge for every e node on the fly and then
+% goes through it, ignoring all the others, equivalent to jestADFS
+jestADFS1([[Name | Rest] | AEGraph], List) :-
+  walk(ae, [[Name | Rest] | AEGraph], [Name | Rest], [Name], List, List).
