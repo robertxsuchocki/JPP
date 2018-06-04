@@ -53,7 +53,7 @@ walk(Case, Graph, [Name, Type], Visited, Visited).
 walk(Case, Graph, [Name, Type, Next | Rest], Visited, Visited) :-
   skipVisited([Next | Rest], Visited, []).
 walk(Case, Graph, [CurrName, Type, Next | Rest1], Visited1, Visited3) :-
-  (Case == g; Type == a), !,
+  \+ (Case == ae, Type == e),
   skipVisited([Next | Rest1], Visited1, Rest2),
   takeAnyName(Rest2, Rest3, NextName),
   findNode(Graph, NextName, Node),
