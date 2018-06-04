@@ -21,57 +21,63 @@ jestWyborem(AEGraph, [Node | Graph]) :-
   jestWyborem(AENew, Graph).
 
 
-skipVisited([], Visited, []).
-skipVisited([Name | Rest], Visited, Result) :-
-  member(Name, Visited),
-  skipVisited(Rest, Visited, Result).
-skipVisited([Name | Rest], Visited, [Name | Result]) :-
-  \+ member(Name, Visited),
-  skipVisited(Rest, Visited, Result).
+skipVisited([], List, []).
+skipVisited([Name | Rest], List, Result) :-
+  member(Name, List),
+  skipVisited(Rest, List, Result).
+skipVisited([Name | Rest], List, [Name | Result]) :-
+  \+ member(Name, List),
+  skipVisited(Rest, List, Result).
 
-takeAnyName([Name | Names], Names, Name).
-takeAnyName([OtherName | Names], [OtherName | NewNames], Name) :-
-  takeAnyName(Names, NewNames, Name).
+takeFirstNew([], [New | News], New).
+takeFirstNew([Old | Olds], [Old | News], New) :-
+  takeFirstNew(Olds, News, New).
+
+takeNextName([Name | Names], Names, Name).
+takeNextName([OtherName | Names], [OtherName | NewNames], Name) :-
+  takeNextName(Names, NewNames, Name).
 
 findNode([[Name | Rest] | Graph], Name, [Name | Rest]).
 findNode([OtherNode | Graph], Name, Node) :-
   findNode(Graph, Name, Node).
 
-markVisited(Name, Visited1, Visited2) :-
-  \+ member(Name, Visited1),
-  append(Visited1, [Name], Visited2).
+markVisited(Name, List1, List2) :-
+  \+ member(Name, List1),
+  append(List1, [Name], List2).
 
-walkWithCheck(Case, Graph, [Name, Type, Next | Rest], Visited1, Visited3) :-
-  markVisited(Name, Visited1, Visited2),
-  walk(Case, Graph, [Name, Type, Next | Rest], Visited2, Visited3).
-walkWithCheck(Case, Graph, [Name, Type], Visited1, Visited2) :-
-  markVisited(Name, Visited1, Visited2).
-walkWithCheck(Case, Graph, [Name | Rest], Visited, Visited) :-
-  member(Name, Visited).
+walkWithCheck(Case, Graph, [Name, Type, Next | Rest], List1, List3, ListL) :-
+  markVisited(Name, List1, List2),
+  walk(Case, Graph, [Name, Type, Next | Rest], List2, List3, ListL).
+walkWithCheck(Case, Graph, [Name, Type], List1, List2, ListL) :-
+  markVisited(Name, List1, List2).
+walkWithCheck(Case, Graph, [Name | Rest], List, List, ListL) :-
+  member(Name, List).
 
-walk(Case, Graph, [Name, Type], Visited, Visited).
-walk(Case, Graph, [Name, Type, Next | Rest], Visited, Visited) :-
-  skipVisited([Next | Rest], Visited, []).
-walk(Case, Graph, [CurrName, Type, Next | Rest1], Visited1, Visited3) :-
+walk(Case, Graph, [Name, Type], List, List, ListL).
+walk(Case, Graph, [Name, Type, Next | Rest], List, List, ListL) :-
+  skipVisited([Next | Rest], List, []).
+walk(Case, Graph, [CurrName, Type, Next | Rest1], List1, List3, ListL) :-
   \+ (Case == ae, Type == e),
-  skipVisited([Next | Rest1], Visited1, Rest2),
-  takeAnyName(Rest2, Rest3, NextName),
+  skipVisited([Next | Rest1], List1, Rest2),
+  takeFirstNew(List1, ListL, NextName),
+  takeNextName(Rest2, Rest3, NextName),
   findNode(Graph, NextName, Node),
-  walkWithCheck(Case, Graph, Node, Visited1, Visited2),
-  walk(Case, Graph, [CurrName, Type | Rest3], Visited2, Visited3).
-walk(ae, Graph, [CurrName, e, Next | Rest1], Visited, Visited) :-
-  takeAnyName([Next | Rest1], Rest2, NextName),
-  member(NextName, Visited).
-walk(ae, Graph, [CurrName, e, Next | Rest1], Visited1, Visited2) :-
-  takeAnyName([Next | Rest1], Rest2, NextName),
-  \+ member(NextName, Visited1),
-  skipVisited(Rest2, Visited1, Rest3),
+  walkWithCheck(Case, Graph, Node, List1, List2, ListL),
+  walk(Case, Graph, [CurrName, Type | Rest3], List2, List3, ListL).
+walk(ae, Graph, [CurrName, e, Next | Rest1], List, List, ListL) :-
+  takeNextName([Next | Rest1], Rest2, NextName),
+  member(NextName, List).
+walk(ae, Graph, [CurrName, e, Next | Rest1], List1, List2, ListL) :-
+  takeFirstNew(List1, ListL, NextName),
+  takeNextName([Next | Rest1], Rest2, NextName),
+  \+ member(NextName, List1),
+  skipVisited(Rest2, List1, Rest3),
   findNode(Graph, NextName, Node),
-  walkWithCheck(ae, Graph, Node, Visited1, Visited2).
+  walkWithCheck(ae, Graph, Node, List1, List2, ListL).
 
 
 jestDFS([FirstNode | Graph], List) :-
-  walkWithCheck(g, [FirstNode | Graph], FirstNode, [], List).
+  walkWithCheck(g, [FirstNode | Graph], FirstNode, [], List, List).
 
 
 jestADFS(AEGraph, List) :-
@@ -80,4 +86,4 @@ jestADFS(AEGraph, List) :-
 
 
 jestADFS1([FirstNode | AEGraph], List) :-
-  walkWithCheck(ae, [FirstNode | AEGraph], FirstNode, [], List).
+  walkWithCheck(ae, [FirstNode | AEGraph], FirstNode, [], List, List).

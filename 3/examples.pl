@@ -31,7 +31,7 @@ jestWyborem([[v0, a, v1, v3],[v1, e, v2, v3],[v2, a],[v3, a], [v4, e]], [[v1, e,
 no
 
 
-takeAnyName([v0, v1, v2, v3, v4], X, Y).
+takeNextName([v0, v1, v2, v3, v4], X, Y).
 X = [v1,v2,v3,v4],
 Y = v0 ? ;
 X = [v0,v2,v3,v4],
