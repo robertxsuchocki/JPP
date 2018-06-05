@@ -4,7 +4,7 @@ X = [[v0,e,v1],[v1,e,v3],[v2,a,v3],[v3,a]] ? ;
 X = [[v0,e,v3],[v1,e,v2],[v2,a,v3],[v3,a]] ? ;
 X = [[v0,e,v3],[v1,e,v3],[v2,a,v3],[v3,a]] ? ;
 
-jestWyborem([[v0,a,v1,v3],[v1,e,v2,v3],[v2,a],[v3,a]],[[v3,a],[v2,a],[v1,e,v2],[v0,a,v1,v3]]).
+jestWyborem([[v0,a,v1,v3],[v1,e,v2,v3],[v2,a],[v3,a]],[[v0,a,v1,v3],[v3,a],[v2,a],[v1,e,v2]]).
 yes
 
 jestWyborem([[v0,a,v1,v3],[v1,e,v2,v3],[v2,a],[v3,a],[v4,e]],[[v1,e,v2],[v0,a,v1,v3],[v2,a],[v3,a]]).

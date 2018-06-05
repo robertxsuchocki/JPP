@@ -1,5 +1,11 @@
 % Robert Suchocki 361086
 
+% Note: due to programming habits I've decided to use english names and comments
+% and I've left polish names only for predicates that had been explicitly named
+% in a task description, I hope it won't be taken as a flaw on code style
+% This solution includes all requested predicates with all additional rules
+% mentioned in task evaluation section
+
 % choiceOfNode(A, B) - checks if B can be in a choice of graph containing A,
 % nodes with label a must be identical, nodes with label e are accepted
 % if B contains one from all of node names in A and 0 if A has no edges
@@ -10,20 +16,34 @@ choiseOfNode([Name, e, _Next | AEGraph], [Name, e, Node]) :-
   choiseOfNode([Name, e | AEGraph], [Name, e, Node]).
 
 % matchNodes(O, N, V) - checks whether V can be a choice of any node in O
-% and whether N is a graph O minus a node that V is a choice of
+% and whether N is a graph O minus a node that V is a choice of,
+% when building a graph choice with this predicate first rule will be successful
+% for all choices of first found node and then negation in a second rule
+% will stop computation, which at the end stops generating every possible
+% permutation of this choice, which means that every graph choice will succeed
+% and while building, every graph will be built, but only his first permutation
 matchNodes([AENode | AEGraph], AEGraph, Node) :-
   choiseOfNode(AENode, Node).
 matchNodes([AENode | AEGraph], [AENode | AENew], Node) :-
   \+ choiseOfNode(AENode, Node),
   matchNodes(AEGraph, AENew, Node).
 
-% jestWyborem(AE, G) - checks if graph G is a choice of AEGraph,
+% makeAChoice(AE, G) - checks if graph G is a choice of AEGraph w/o first nodes,
 % it is done by matching the choices of nodes from G to original nodes in AE
-% and removing both after successful match until both lists are empty
-jestWyborem([], []).
-jestWyborem(AEGraph, [Node | Graph]) :-
+% and removing both after successful match until both lists are empty,
+% this predicate matches first node in G with any matching node in AE
+makeAChoice([], []).
+makeAChoice(AEGraph, [Node | Graph]) :-
   matchNodes(AEGraph, AENew, Node),
-  jestWyborem(AENew, Graph).
+  makeAChoice(AENew, Graph).
+
+% jestWyborem(AE, G) - checks if graph G is a choice of AEGraph,
+% firstly checks that first nodes match (w.r.t. answer on forum) and after that
+% tries matching the rest of pairs, disregarding nodes' order, with makeAChoise
+jestWyborem([], []).
+jestWyborem([AENode | AEGraph], [Node | Graph]) :-
+  choiseOfNode(AENode, Node),
+  makeAChoice(AEGraph, Graph).
 
 
 % skipVisited(N, V, R) - checks if array N without elements from V equals to R
@@ -107,7 +127,8 @@ walk(Case, Graph, [CurrName, Type, Next | Rest1], List1, List4, ListR) :-
   ).
 
 
-% jestDFS(G, L) - checks if L is a DFS exploration list for G by computing walk
+% jestDFS(G, L) - checks if L is a DFS exploration list for graph G by
+% computing standard case of walk
 jestDFS([[Name | Rest] | Graph], List) :-
   walk(g, [[Name | Rest] | Graph], [Name | Rest], [Name], List, List).
 
