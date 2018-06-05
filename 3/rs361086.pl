@@ -19,9 +19,9 @@ choiseOfNode([Name, e, _Next | AEGraph], [Name, e, Node]) :-
 % and whether N is a graph O minus a node that V is a choice of,
 % when building a graph choice with this predicate first rule will be successful
 % for all choices of first found node and then negation in a second rule
-% will stop computation, which at the end stops generating every possible
-% permutation of this choice, which means that every graph choice will succeed
-% and while building, every graph will be built, but only his first permutation
+% will stop computation, which at the end stops generating every permutation
+% of this choice, which means that every graph choice permutation will succeed,
+% but while building, every graph will be built, but only his first permutation
 matchNodes([AENode | AEGraph], AEGraph, Node) :-
   choiseOfNode(AENode, Node).
 matchNodes([AENode | AEGraph], [AENode | AENew], Node) :-
