@@ -56,27 +56,27 @@ skipVisited([Name | Rest], Visited, [Name | Result]) :-
   \+ member(Name, Visited),
   skipVisited(Rest, Visited, Result).
 
+% takeFirstNew(O, N, F) - checks if O is a prefix of N and if F is the first
+% element of N that is not in the O,
+% used for optimization of working with DFSs on given lists, algorithm won't
+% generate all of the answers by checking every possibility for next node,
+% but take the first node from result list given to check that is not already
+% in a produced list and use that node instead
+takeFirstNew([], [New | _News], New).
+takeFirstNew([Old | Olds], [Old | News], New) :-
+  takeFirstNew(Olds, News, New).
+
 % takeNextName(O, N, V) - checks if O contains V and whether N is equal to O
 % without element V,
 % method very similar to matchNodes, but doesn't require additional predicates
 % in matching elements and just uses pattern match of strings,
 % in algorithm with given list this predicate checks if name is in neighbourhood
-% list of node and subtracts it from it into N,
+% list of node and subtracts this name from list into N,
 % if list is not given then this predicate is responsible for extracting every
 % possible node name from list for further moves and thus generates every path
 takeNextName([Name | Names], Names, Name).
 takeNextName([OtherName | OldNames], [OtherName | NewNames], Name) :-
   takeNextName(OldNames, NewNames, Name).
-
-% takeFirstNew(O, N, F) - checks if O is a prefix of N and if F is the first
-% element of N that is not in the O,
-% used for optimization of working with DFSs on given lists, algorithm won't
-% generate all of the answers by checking every possibility for next node,
-% but take the first node from list given to check that is not already
-% in a produced list and use that node instead
-takeFirstNew([], [New | _News], New).
-takeFirstNew([Old | Olds], [Old | News], New) :-
-  takeFirstNew(Olds, News, New).
 
 % findNode(G, N, V) - checks if G contains node V with name N,
 % used for receiving full node after choosing name with 2 functions above
@@ -106,10 +106,10 @@ walk(ae, _Graph, [_CurrName, e, Next | Rest1], List, List, _ListR) :-
   member(NextName, List).
 % this rule makes the move in a graph
 walk(Case, Graph, [CurrName, Type, Next | Rest1], List1, List4, ListR) :-
-  % firstly, we try to get next node from result list
-  takeFirstNew(List1, ListR, NextName),
-  % we reduce neighbourhood list with already visited nodes
+  % at start, we reduce neighbourhood list by already visited nodes
   skipVisited([Next | Rest1], List1, Rest2),
+  % choosing name, firstly we try to get next node from result list
+  takeFirstNew(List1, ListR, NextName),
   % now we either check if node from result list is valid or choose next name
   takeNextName(Rest2, Rest3, NextName),
   % after retrieving name, let's get entire node
