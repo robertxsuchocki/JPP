@@ -19,13 +19,13 @@ cabal.sandbox.config
 cabal.project.local
 .HTF/
 
-Abs*
-Doc*
-Err*
-Lex*
-Par*
-Print*
-Skel*
-Test*
-interpreter
+2/Abs*
+2/Doc*
+2/Err*
+2/Lex*
+2/Par*
+2/Print*
+2/Skel*
+2/Test*
+2/interpreter
 
