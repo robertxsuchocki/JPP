@@ -10,16 +10,82 @@ ParserLL1 comment: ''!
 !ParserLL1 categoriesForClass!Kernel-Objects! !
 !ParserLL1 methodsFor!
 
+accept
+	^(self nullable) includes: start!
+
+nullable
+	|new_r eps_r eps new_eps|
+	new_r := rules reject: [:e | e hasTerminals].
+	eps_r := new_r select: [:e | e hasEpsilon].
+	eps := Set new.
+	new_eps := eps_r collect: [:e | e left].
+	[new_eps notEmpty] whileTrue: [
+		new_eps do: [:e | eps add: e].
+		eps_r := new_r select: [:e | (e right reject: [:f | eps includes: f]) isEmpty].
+		new_r := new_r reject: [:e | (e right reject: [:f | eps includes: f]) isEmpty].
+		new_eps := eps_r collect: [:e | e left]
+	].
+	^eps!
+
+predict
+	|new_r ready visited terms nullable|
+	new_r := rules deepCopy.
+	ready := Set with: start.
+	visited := Set new.
+	terms := Set new.
+	nullable := self nullable.
+	[ready notEmpty] whileTrue: [
+		|next next_r valid|
+		next := (ready asArray) first.
+		next_r := new_r select: [:e | e left = next].
+		next_r do: [:e |
+			valid := true.
+			(e right) do: [:f |
+				(f isNonterminal) & ((nullable includes: f) not) ifTrue: [valid := false].
+				valid ifTrue: [
+					(f isNonterminal) ifTrue: [ready add: f].
+					(f isTerminal) ifTrue: [terms add: f]
+				].
+				(f isTerminal) ifTrue: [valid := false].
+			].
+		].
+		ready remove: next.
+		visited add: next
+	].
+	^(terms collect: [:e | e symbol]) asOrderedCollection!
+
 printOn: stream
 	start printOn: stream.
 	' => ' printOn: stream.
 	rules printOn: stream!
 
+reject
+	^((self terminating) includes: start) not!
+
 start: s rules: r
         start := s.
-        rules := r! !
+        rules := r!
+
+terminating
+	|new_r term_r term new_term|
+	new_r := rules deepCopy.
+	term_r := new_r reject: [:e | e hasNonterminals].
+	term := Set new.
+	new_term := term_r collect: [:e | e left].
+	[new_term notEmpty] whileTrue: [
+		new_term do: [:e | term add: e].
+		term_r := new_r select: [:e | (e right reject: [:f | (f isTerminal) | (term includes: f)]) isEmpty].
+		new_r := new_r reject: [:e | (e right reject: [:f | (f isTerminal) | (term includes: f)]) isEmpty].
+		new_term := term_r collect: [:e | e left]
+	].
+	^term! !
+!ParserLL1 categoriesFor: #accept!public! !
+!ParserLL1 categoriesFor: #nullable!private! !
+!ParserLL1 categoriesFor: #predict!public! !
 !ParserLL1 categoriesFor: #printOn:!public! !
+!ParserLL1 categoriesFor: #reject!public! !
 !ParserLL1 categoriesFor: #start:rules:!private! !
+!ParserLL1 categoriesFor: #terminating!private! !
 
 !ParserLL1 class methodsFor!
 

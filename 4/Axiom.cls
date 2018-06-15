@@ -17,6 +17,12 @@ Axiom comment: ''!
 hash
 	^self class hash bitXor: self symbol hash!
 
+isNonterminal
+	^false!
+
+isTerminal
+	^false!
+
 printOn: stream
 	symbol printOn: stream!
 
@@ -27,6 +33,8 @@ symbol: s
 	symbol := s! !
 !Axiom categoriesFor: #=!public! !
 !Axiom categoriesFor: #hash!public! !
+!Axiom categoriesFor: #isNonterminal!private! !
+!Axiom categoriesFor: #isTerminal!private! !
 !Axiom categoriesFor: #printOn:!public! !
 !Axiom categoriesFor: #symbol!private! !
 !Axiom categoriesFor: #symbol:!private! !

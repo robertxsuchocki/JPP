@@ -8,3 +8,9 @@ Axiom subclass: #Nonterminal
 Nonterminal guid: (GUID fromString: '{A77B35DB-8CC4-425E-8E36-D6F3DCDCAE7F}')!
 Nonterminal comment: ''!
 !Nonterminal categoriesForClass!Kernel-Objects! !
+!Nonterminal methodsFor!
+
+isNonterminal
+	^true! !
+!Nonterminal categoriesFor: #isNonterminal!private! !
+

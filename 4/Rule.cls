@@ -10,6 +10,17 @@ Rule comment: ''!
 !Rule categoriesForClass!Kernel-Objects! !
 !Rule methodsFor!
 
+hasEpsilon
+	^right isEmpty!
+
+hasNonterminals
+	right do: [:e | (e isNonterminal) ifTrue: [^true]].
+	^false!
+
+hasTerminals
+	right do: [:e | (e isTerminal) ifTrue: [^true]].
+	^false!
+
 left
 	^left!
 
@@ -33,13 +44,20 @@ printOn: stream
 	left printOn: stream.
 	right printOn: stream!
 
+right
+	^right!
+
 right: i
 	^right at: i ifAbsent: []! !
+!Rule categoriesFor: #hasEpsilon!private! !
+!Rule categoriesFor: #hasNonterminals!private! !
+!Rule categoriesFor: #hasTerminals!private! !
 !Rule categoriesFor: #left!private! !
 !Rule categoriesFor: #left:right:!private! !
 !Rule categoriesFor: #leftRecursive!private! !
 !Rule categoriesFor: #nondeterministic:!private! !
 !Rule categoriesFor: #printOn:!public! !
+!Rule categoriesFor: #right!private! !
 !Rule categoriesFor: #right:!private! !
 
 !Rule class methodsFor!
