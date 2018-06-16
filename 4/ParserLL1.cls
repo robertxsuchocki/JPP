@@ -13,6 +13,39 @@ ParserLL1 comment: ''!
 accept
 	^(self nullable) includes: start!
 
+getNullNontermRules: r
+	|new_r nullable cut_r next|
+	new_r := Set new.
+	nullable := (self nullable).
+	r do: [ :e |
+		cut_r := e right.
+		[cut_r notEmpty] whileTrue: [
+			next := cut_r at: 1.
+			cut_r := cut_r copyFrom: 2.
+			(nullable includes: next)
+				ifTrue: [
+					new_r add: (Rule left: (e left) right: cut_r).
+				]
+				ifFalse: [
+					cut_r := cut_r reject: [:f|true].
+				].
+		]
+	].
+	^(r, (new_r asArray))!
+
+getReactRules: x
+	|new_r ready visited new_ready|
+	new_r := rules deepCopy.
+	ready := Set with: (Rule left: (Terminal symbol: x) right: #()).
+	visited := Set new.
+	[ready notEmpty] whileTrue: [
+		new_ready := (new_r collect: [:e | (e react: (ready asArray))]) select: [:e | e notNil].
+		new_r := new_r reject: [:e | (e react: (ready asArray)) notNil].
+		ready do: [:e | visited add: e].
+		ready := new_ready
+	].
+	^visited asArray!
+
 nullable
 	|new_r eps_r eps new_eps|
 	new_r := rules reject: [:e | e hasTerminals].
@@ -58,20 +91,19 @@ printOn: stream
 	rules printOn: stream!
 
 react: x
-	|new_r ready visited new_ready|
-	new_r := rules deepCopy.
-	ready := Set with: (Rule left: (Terminal symbol: x) right: #()).
-	visited := Set new.
-	[ready notEmpty] whileTrue: [
-		new_ready := (new_r collect: [:e | (e react: (ready asArray))]) select: [:e | e notNil].
-		new_r := new_r reject: [:e | (e react: (ready asArray)) notNil].
-		ready do: [:e | visited add: e].
-		ready := new_ready
-	].
-	^visited asArray!
+	|react_r curr_r null_r next_r const_r|
+	const_r := rules reject: [:e | (e left) symbol isNil].
+	curr_r := rules select: [:e | (e left) symbol isNil].
+	null_r := (self getNullNontermRules: curr_r).
+	react_r := (self getReactRules: x).
+	next_r := (null_r collect: [:e | e react: react_r]) select: [:e | e notNil].
+	rules := (next_r, const_r)!
 
 reject
 	^((self terminating) includes: start) not!
+
+rules
+	^rules!
 
 start: s rules: r
         start := s.
@@ -91,11 +123,14 @@ terminating
 	].
 	^term! !
 !ParserLL1 categoriesFor: #accept!public! !
+!ParserLL1 categoriesFor: #getNullNontermRules:!private! !
+!ParserLL1 categoriesFor: #getReactRules:!private! !
 !ParserLL1 categoriesFor: #nullable!private! !
 !ParserLL1 categoriesFor: #predict!public! !
 !ParserLL1 categoriesFor: #printOn:!public! !
 !ParserLL1 categoriesFor: #react:!public! !
 !ParserLL1 categoriesFor: #reject!public! !
+!ParserLL1 categoriesFor: #rules!private! !
 !ParserLL1 categoriesFor: #start:rules:!private! !
 !ParserLL1 categoriesFor: #terminating!private! !
 
@@ -115,7 +150,7 @@ nonRecursive: r
 !
 
 objectify: r start: s
-	|nonterms new_r new_key new_value|
+	|nonterms new_r curr_r new_key new_value|
 	nonterms := Set with: s.
 	r do: [:e | nonterms add: e key].
 
@@ -132,13 +167,14 @@ objectify: r start: s
 			].
 			Rule left: new_key right: new_value
 		].
-	^new_r!
+	curr_r := (new_r select: [:e | (e left) symbol = s]) collect: [:e | Rule left: (Nonterminal symbol: nil) right: (e right)].
+	^(curr_r asArray, new_r asArray)!
 
 start: s rules: r
 	|new_r|
 	new_r := self objectify: r start: s.
 	(self isLL1: new_r)
-		ifTrue: [^self new start: (Nonterminal symbol: s) rules: new_r]
+		ifTrue: [^self new start: (Nonterminal symbol: nil) rules: new_r]
 		ifFalse: [^nil]! !
 !ParserLL1 class categoriesFor: #deterministic:!private! !
 !ParserLL1 class categoriesFor: #isLL1:!private! !
