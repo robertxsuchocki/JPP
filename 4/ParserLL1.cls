@@ -55,9 +55,20 @@ predict
 	^(terms collect: [:e | e symbol]) asOrderedCollection!
 
 printOn: stream
-	start printOn: stream.
-	' => ' printOn: stream.
 	rules printOn: stream!
+
+react: x
+	|new_r ready visited new_ready|
+	new_r := rules deepCopy.
+	ready := Set with: (Rule left: (Terminal symbol: x) right: #()).
+	visited := Set new.
+	[ready notEmpty] whileTrue: [
+		new_ready := (new_r collect: [:e | (e react: (ready asArray))]) select: [:e | e notNil].
+		new_r := new_r reject: [:e | (e react: (ready asArray)) notNil].
+		ready do: [:e | visited add: e].
+		ready := new_ready
+	].
+	^visited asArray!
 
 reject
 	^((self terminating) includes: start) not!
@@ -83,6 +94,7 @@ terminating
 !ParserLL1 categoriesFor: #nullable!private! !
 !ParserLL1 categoriesFor: #predict!public! !
 !ParserLL1 categoriesFor: #printOn:!public! !
+!ParserLL1 categoriesFor: #react:!public! !
 !ParserLL1 categoriesFor: #reject!public! !
 !ParserLL1 categoriesFor: #start:rules:!private! !
 !ParserLL1 categoriesFor: #terminating!private! !

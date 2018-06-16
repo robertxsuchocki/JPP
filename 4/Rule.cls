@@ -44,6 +44,12 @@ printOn: stream
 	left printOn: stream.
 	right printOn: stream!
 
+react: r
+	|rule new_right|
+	rule := (r select: [:e | (e left) = (self right: 1)]) at: 1 ifAbsent: [^nil].
+	new_right := (rule right, ((self right) copyFrom: 2)).
+	^(Rule left: (self left) right: new_right)!
+
 right
 	^right!
 
@@ -57,6 +63,7 @@ right: i
 !Rule categoriesFor: #leftRecursive!private! !
 !Rule categoriesFor: #nondeterministic:!private! !
 !Rule categoriesFor: #printOn:!public! !
+!Rule categoriesFor: #react:!private! !
 !Rule categoriesFor: #right!private! !
 !Rule categoriesFor: #right:!private! !
 
