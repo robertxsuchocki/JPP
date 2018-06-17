@@ -74,13 +74,12 @@ predict
 		next_r do: [:e |
 			valid := true.
 			(e right) do: [:f |
-				(f isNonterminal) & ((nullable includes: f) not) ifTrue: [valid := false].
 				valid ifTrue: [
 					(f isNonterminal) ifTrue: [ready add: f].
-					(f isTerminal) ifTrue: [terms add: f]
-				].
-				(f isTerminal) ifTrue: [valid := false].
-			].
+					(f isTerminal) ifTrue: [terms add: f].
+					(f isNonterminal) & (nullable includes: f) ifFalse: [valid := false].
+				]
+			]
 		].
 		ready remove: next.
 		visited add: next
@@ -97,7 +96,7 @@ react: x
 	null_r := (self getNullNontermRules: curr_r).
 	react_r := (self getReactRules: x).
 	next_r := (null_r collect: [:e | e react: react_r]) select: [:e | e notNil].
-	rules := (next_r, const_r)!
+	^(ParserLL1 startRaw: start rulesRaw: (next_r, const_r))!
 
 reject
 	^((self terminating) includes: start) not!
@@ -175,10 +174,14 @@ start: s rules: r
 	new_r := self objectify: r start: s.
 	(self isLL1: new_r)
 		ifTrue: [^self new start: (Nonterminal symbol: nil) rules: new_r]
-		ifFalse: [^nil]! !
+		ifFalse: [^nil]!
+
+startRaw: s rulesRaw: r
+	^self new start: s rules: r! !
 !ParserLL1 class categoriesFor: #deterministic:!private! !
 !ParserLL1 class categoriesFor: #isLL1:!private! !
 !ParserLL1 class categoriesFor: #nonRecursive:!private! !
 !ParserLL1 class categoriesFor: #objectify:start:!private! !
 !ParserLL1 class categoriesFor: #start:rules:!public! !
+!ParserLL1 class categoriesFor: #startRaw:rulesRaw:!private! !
 
