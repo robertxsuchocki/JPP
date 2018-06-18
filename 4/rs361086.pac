@@ -105,7 +105,7 @@ symbol: s
 symbol: s
 	"Generates new object with symbol as axiom name"
 	^self new symbol: s! !
-!Axiom class categoriesFor: #symbol:!public! !
+!Axiom class categoriesFor: #symbol:!private! !
 
 ParserLL1 guid: (GUID fromString: '{2EF7CE94-83D7-454F-B81F-75F2CE6FA80D}')!
 ParserLL1 comment: ''!
@@ -116,7 +116,7 @@ accept
 	"Answer if language contains empty string.
 	Similarly to reject, this uses nullable method and checks if start is contained,
 	which means that you can get empty string from starting nonterminal"
-	^(self nullable) includes: start!
+	^(self nullable) includes: (self start)!
 
 getNullNontermRules: r
 	"Given rules, expand them with additional rules that may occur if we
@@ -150,7 +150,7 @@ getReactRules: x
 	affected by any of these rules (first right side axiom equals left side axiom)
 	until it stops expanding and no more rules can be produced"
 	|new_r ready visited new_ready|
-	new_r := rules deepCopy.
+	new_r := (self rules) deepCopy.
 	ready := Set with: (Rule left: (Terminal symbol: x) right: #()).
 	visited := Set new.
 	[ready notEmpty] whileTrue: [
@@ -168,7 +168,7 @@ nullable
 	nonterminals that have rules containing only nonterminals from nullable set
 	until it doesn't extend anymore, which stops our search"
 	|new_r eps_r eps new_eps|
-	new_r := rules reject: [:e | e hasTerminals].
+	new_r := (self rules) reject: [:e | e hasTerminals].
 	eps_r := new_r select: [:e | e hasEpsilon].
 	eps := Set new.
 	new_eps := eps_r collect: [:e | e left].
@@ -188,8 +188,8 @@ predict
 	then goes through all nonterminals as they can also contain first terminals of words
 	and remembers its first terminals until queue's empty and there's nothing to find"
 	|new_r ready visited terms nullable|
-	new_r := rules deepCopy.
-	ready := Set with: start.
+	new_r := (self rules) deepCopy.
+	ready := Set with: (self start).
 	visited := Set new.
 	terms := Set new.
 	nullable := self nullable.
@@ -219,9 +219,10 @@ react: x
 	with all possibilities given by getNullNontermRules and finally applies
 	rules from getReactRules on them, retrieving current state for rules
 	that got affected and removing unfitting rules by filtering out nils"
-	|react_r curr_r null_r next_r const_r|
-	const_r := rules reject: [:e | (e left) symbol isNil].
-	curr_r := rules select: [:e | (e left) symbol isNil].
+	|self_r const_r curr_r null_r react_r next_r|
+	self_r := self rules.
+	const_r := self_r reject: [:e | (e left) symbol isNil].
+	curr_r := self_r select: [:e | (e left) symbol isNil].
 	null_r := (self getNullNontermRules: curr_r).
 	react_r := (self getReactRules: x).
 	next_r := (null_r collect: [:e | e react: react_r]) select: [:e | e notNil].
@@ -231,7 +232,13 @@ reject
 	"Answer if language is empty.
 	This makes use of terminating method and checks whether start is excluded,
 	which means that no word can be built from starting point"
-	^((self terminating) includes: start) not!
+	^((self terminating) includes: (self start)) not!
+
+rules
+	^rules!
+
+start
+	^start!
 
 start: s rules: r
 	"Simply initialize start axiom and rules collection
@@ -246,7 +253,7 @@ terminating
 	nonterminals that have rules containing nonterminals from terminating set and/or
 	terminals until it doesn't extend anymore, which stops our search"
 	|new_r term_r term new_term|
-	new_r := rules deepCopy.
+	new_r := (self rules) deepCopy.
 	term_r := new_r reject: [:e | e hasNonterminals].
 	term := Set new.
 	new_term := term_r collect: [:e | e left].
@@ -264,6 +271,8 @@ terminating
 !ParserLL1 categoriesFor: #predict!public! !
 !ParserLL1 categoriesFor: #react:!public! !
 !ParserLL1 categoriesFor: #reject!public! !
+!ParserLL1 categoriesFor: #rules!private! !
+!ParserLL1 categoriesFor: #start!private! !
 !ParserLL1 categoriesFor: #start:rules:!private! !
 !ParserLL1 categoriesFor: #terminating!private! !
 
@@ -356,16 +365,16 @@ Rule comment: ''!
 
 hasEpsilon
 	"Answers if right side represents empty string"
-	^right isEmpty!
+	^(self right) isEmpty!
 
 hasNonterminals
 	"Answers if right side of rule contains any amount of nonterminals"
-	right do: [:e | (e isNonterminal) ifTrue: [^true]].
+	(self right) do: [:e | (e isNonterminal) ifTrue: [^true]].
 	^false!
 
 hasTerminals
 	"Answers if right side of rule contains any amount of terminals"
-	right do: [:e | (e isTerminal) ifTrue: [^true]].
+	(self right) do: [:e | (e isTerminal) ifTrue: [^true]].
 	^false!
 
 left
@@ -380,9 +389,7 @@ leftRecursive
 	"Answers if rule is left recursive.
 	Checks if left side of production is equal to first axiom in right side,
 	returns true if above is true and false otherwise"
-	(right isEmpty) ifTrue: [^false].
-	(left ~= (right at: 1)) ifTrue: [^false].
-	^true!
+	^((self left) = (self right: 1))!
 
 nondeterministic: r
 	"Answers if rule is nondeterministic given the set of rules r.
@@ -391,8 +398,7 @@ nondeterministic: r
 	|new_r similar|
 	new_r := r reject: [:e | e = self].
 	similar := new_r detect: [:other | (self left = other left) & ((self right: 1) = (other right: 1))] ifNone: [].
-	similar isNil ifTrue: [^false].
-	^true!
+	^(similar notNil)!
 
 react: r
 	"Returns a new rule that is a result of it being changed by any rule in r.
@@ -426,7 +432,7 @@ right: i
 left: l right: r
 	"Generates rule based on ready objects"
 	^self new left: l right: r! !
-!Rule class categoriesFor: #left:right:!public! !
+!Rule class categoriesFor: #left:right:!private! !
 
 Nonterminal guid: (GUID fromString: '{A77B35DB-8CC4-425E-8E36-D6F3DCDCAE7F}')!
 Nonterminal comment: ''!

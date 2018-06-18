@@ -12,16 +12,16 @@ Rule comment: ''!
 
 hasEpsilon
 	"Answers if right side represents empty string"
-	^right isEmpty!
+	^(self right) isEmpty!
 
 hasNonterminals
 	"Answers if right side of rule contains any amount of nonterminals"
-	right do: [:e | (e isNonterminal) ifTrue: [^true]].
+	(self right) do: [:e | (e isNonterminal) ifTrue: [^true]].
 	^false!
 
 hasTerminals
 	"Answers if right side of rule contains any amount of terminals"
-	right do: [:e | (e isTerminal) ifTrue: [^true]].
+	(self right) do: [:e | (e isTerminal) ifTrue: [^true]].
 	^false!
 
 left
@@ -36,9 +36,7 @@ leftRecursive
 	"Answers if rule is left recursive.
 	Checks if left side of production is equal to first axiom in right side,
 	returns true if above is true and false otherwise"
-	(right isEmpty) ifTrue: [^false].
-	(left ~= (right at: 1)) ifTrue: [^false].
-	^true!
+	^((self left) = (self right: 1))!
 
 nondeterministic: r
 	"Answers if rule is nondeterministic given the set of rules r.
@@ -47,8 +45,7 @@ nondeterministic: r
 	|new_r similar|
 	new_r := r reject: [:e | e = self].
 	similar := new_r detect: [:other | (self left = other left) & ((self right: 1) = (other right: 1))] ifNone: [].
-	similar isNil ifTrue: [^false].
-	^true!
+	^(similar notNil)!
 
 react: r
 	"Returns a new rule that is a result of it being changed by any rule in r.
@@ -82,5 +79,5 @@ right: i
 left: l right: r
 	"Generates rule based on ready objects"
 	^self new left: l right: r! !
-!Rule class categoriesFor: #left:right:!public! !
+!Rule class categoriesFor: #left:right:!private! !
 

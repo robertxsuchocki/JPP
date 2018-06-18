@@ -47,5 +47,5 @@ symbol: s
 symbol: s
 	"Generates new object with symbol as axiom name"
 	^self new symbol: s! !
-!Axiom class categoriesFor: #symbol:!public! !
+!Axiom class categoriesFor: #symbol:!private! !
 
